@@ -8,6 +8,7 @@ An MCP server with three tools:
 Data: Open-Meteo Marine and Forecast APIs (free, no API key).
 """
 
+import argparse
 import asyncio
 import json
 import logging
@@ -16,6 +17,7 @@ from pathlib import Path
 
 import httpx
 from mcp.server.mcpserver import MCPServer
+from mcp.types import ToolAnnotations
 
 from risk import assess
 from zones import find_zone, zone_names
@@ -27,6 +29,7 @@ IST = timezone(timedelta(hours=5, minutes=30))
 USERS_FILE = Path(__file__).parent / "data" / "users.json"
 
 logging.getLogger("httpx").setLevel(logging.WARNING)  # hide per-request log lines
+log = logging.getLogger("seasense")  # logs go to stderr, never into the MCP stdio stream
 
 server = MCPServer(
     "SeaSense",
@@ -118,7 +121,7 @@ async def fetch_conditions(zone: dict) -> dict:
 
 # ---------- tools ----------
 
-@server.tool()
+@server.tool(annotations=ToolAnnotations(read_only_hint=True, open_world_hint=True))
 async def get_sea_briefing(zone: str = "", user: str = "") -> str:
     """Spoken sea-safety briefing for a fishing zone: waves, wind, rain and a
     trip-risk verdict for the next 12 hours. Give a zone name, or a user name
@@ -129,6 +132,7 @@ async def get_sea_briefing(zone: str = "", user: str = "") -> str:
     try:
         c = await fetch_conditions(z)
     except Exception:
+        log.exception("forecast fetch failed for %s", z["name"])
         return f"Sorry, I couldn't get the sea forecast for {z['name']} right now. Please try again in a minute."
 
     level, reason = assess(c["wave_max"], c["gust_max"])
@@ -143,7 +147,7 @@ async def get_sea_briefing(zone: str = "", user: str = "") -> str:
     )
 
 
-@server.tool()
+@server.tool(annotations=ToolAnnotations(read_only_hint=True, open_world_hint=True))
 async def check_trip_risk(zone: str = "", user: str = "") -> str:
     """Quick go / no-go check for a fishing trip in the next 12 hours.
     Returns Safe, Caution or Don't go, with the one reason that decided it."""
@@ -153,6 +157,7 @@ async def check_trip_risk(zone: str = "", user: str = "") -> str:
     try:
         c = await fetch_conditions(z)
     except Exception:
+        log.exception("forecast fetch failed for %s", z["name"])
         return f"Sorry, I couldn't check conditions for {z['name']} right now. Please try again in a minute."
 
     level, reason = assess(c["wave_max"], c["gust_max"])
@@ -164,9 +169,11 @@ async def check_trip_risk(zone: str = "", user: str = "") -> str:
     return f"{level} for {z['name']}: {reason} expected in the next {TRIP_HOURS} hours. {advice}"
 
 
-@server.tool()
+@server.tool(annotations=ToolAnnotations(read_only_hint=False, idempotent_hint=True))
 async def save_my_zone(user: str, zone: str) -> str:
     """Remember a user's usual fishing zone, so later briefings need no zone."""
+    if not user.strip():
+        return "Please tell me your name so I can remember your zone."
     z = find_zone(zone)
     if not z:
         return f"I don't know the zone '{zone}'. I know: {zone_names()}."
@@ -177,4 +184,14 @@ async def save_my_zone(user: str, zone: str) -> str:
 
 
 if __name__ == "__main__":
-    server.run()
+    parser = argparse.ArgumentParser(description="Run the SeaSense MCP server.")
+    parser.add_argument("--http", action="store_true",
+                        help="serve over Streamable HTTP (for Alexa+ and remote clients) instead of stdio")
+    parser.add_argument("--host", default="127.0.0.1")
+    parser.add_argument("--port", type=int, default=8000)
+    args = parser.parse_args()
+    if args.http:
+        # Streamable HTTP endpoint: http://<host>:<port>/mcp
+        server.run("streamable-http", host=args.host, port=args.port)
+    else:
+        server.run()  # stdio, for MCP Inspector and Claude Desktop

@@ -19,7 +19,9 @@ def find_zone(text: str) -> dict | None:
     if not key:
         return None
     for zone_key, zone in ZONES.items():
-        if zone_key in key or key in zone_key:
+        # "key in zone_key" lets short names like "rames" match, but needs
+        # at least 3 letters so a stray "a" doesn't match the first zone
+        if zone_key in key or (len(key) >= 3 and key in zone_key):
             return zone
     return None
 
