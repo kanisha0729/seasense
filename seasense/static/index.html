@@ -1,0 +1,792 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dashboard · SeaSense</title>
+<meta name="description" content="Live sea-safety briefing for your fishing zone: waves, wind, rain and a clear Safe, Caution or Don't go verdict, in English, Tamil or Hindi.">
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#071a2e">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+Tamil:wght@400;600;700&family=Noto+Sans+Devanagari:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #071a2e;
+    --bg-2: #0b2440;
+    --card: #0f2d4d;
+    --card-line: #1d4570;
+    --ink: #eaf4ff;
+    --ink-2: #9fbfdd;
+    --ink-3: #6f93b5;
+    --sun: #ffc857;
+    --safe: #2ecc8f;
+    --caution: #ffb020;
+    --danger: #ff5a5f;
+    --level: var(--ink-3);
+    --t-fast: 160ms;
+    --font: "Inter", "Noto Sans Tamil", "Noto Sans Devanagari", system-ui, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    background: radial-gradient(1200px 600px at 80% -10%, #12406b 0%, transparent 60%), var(--bg);
+    color: var(--ink);
+    font-family: var(--font);
+    min-height: 100vh;
+  }
+  body[data-level="safe"]    { --level: var(--safe); }
+  body[data-level="caution"] { --level: var(--caution); }
+  body[data-level="danger"]  { --level: var(--danger); }
+
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 24px 16px 40px; }
+
+  header { display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; }
+  .brand { display: flex; align-items: center; gap: 12px; }
+  .brand h1 { margin: 0; font-size: 28px; font-weight: 800; letter-spacing: -0.5px; }
+  .brand p { margin: 2px 0 0; color: var(--ink-2); font-size: 14px; }
+  .logo { width: 44px; height: 44px; flex: none; }
+
+  .seg { display: inline-flex; background: var(--bg-2); border: 1px solid var(--card-line); border-radius: 999px; padding: 4px; }
+  .seg button {
+    font: inherit; font-size: 14px; font-weight: 600; color: var(--ink-2);
+    background: none; border: 0; border-radius: 999px; padding: 8px 14px; cursor: pointer;
+  }
+  .seg button[aria-pressed="true"] { background: var(--sun); color: #1a1200; }
+
+  .head-right { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .user { display: flex; align-items: center; gap: 10px; background: var(--bg-2); border: 1px solid var(--card-line); border-radius: 999px; padding: 4px 4px 4px 4px; }
+  .avatar { width: 32px; height: 32px; border-radius: 50%; background: var(--sun); color: #1a1200; display: grid; place-items: center; font-weight: 800; font-size: 14px; }
+  .uname { font-weight: 600; font-size: 14px; max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .signout { font: inherit; font-size: 13px; font-weight: 600; color: var(--ink-2); background: var(--card); border: 1px solid var(--card-line); border-radius: 999px; padding: 6px 12px; cursor: pointer; }
+  .signout:hover { color: var(--ink); }
+  .greet { margin-top: 26px; font-size: 22px; font-weight: 700; letter-spacing: -0.3px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .saved { font-size: 12px; font-weight: 600; color: var(--safe); opacity: 0; transition: opacity .3s; }
+  .saved.show { opacity: 1; }
+  .label { color: var(--ink-3); font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; margin: 18px 0 10px; }
+  .zones { display: flex; gap: 8px; flex-wrap: wrap; }
+  .zones button {
+    font: inherit; font-size: 15px; font-weight: 600; color: var(--ink);
+    background: var(--card); border: 1px solid var(--card-line); border-radius: 12px;
+    padding: 10px 16px; cursor: pointer;
+  }
+  .zones button[aria-pressed="true"] { border-color: var(--sun); box-shadow: inset 0 0 0 1px var(--sun); }
+
+  .grid { display: grid; grid-template-columns: 1.15fr 1fr; gap: 16px; margin-top: 20px; }
+  .card { background: var(--card); border: 1px solid var(--card-line); border-radius: 18px; padding: 22px; }
+
+  .verdict { border-color: var(--level); background: linear-gradient(160deg, color-mix(in srgb, var(--level) 18%, var(--card)) 0%, var(--card) 70%); }
+  .verdict .small { color: var(--ink-2); font-size: 13px; font-weight: 600; }
+  .verdict .zone-name { font-size: 15px; color: var(--ink-2); margin-top: 14px; }
+  .level-word { font-size: 44px; font-weight: 800; color: var(--level); line-height: 1.1; margin: 4px 0 10px; }
+  .reason { font-size: 17px; font-weight: 600; }
+  .advice { font-size: 15px; color: var(--ink-2); margin-top: 6px; line-height: 1.5; }
+  .actions { display: flex; gap: 10px; margin-top: 20px; flex-wrap: wrap; }
+  .btn {
+    font: inherit; font-size: 15px; font-weight: 700; border-radius: 12px; padding: 12px 18px; cursor: pointer;
+    display: inline-flex; align-items: center; gap: 8px; border: 1px solid var(--card-line); background: var(--bg-2); color: var(--ink);
+  }
+  .btn.primary { background: var(--sun); color: #1a1200; border-color: var(--sun); }
+  .btn svg { width: 18px; height: 18px; }
+
+  .tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .tile { background: var(--bg-2); border: 1px solid var(--card-line); border-radius: 14px; padding: 14px; }
+  .tile .k { color: var(--ink-3); font-size: 12px; font-weight: 600; }
+  .tile .v { font-size: 28px; font-weight: 800; margin-top: 4px; }
+  .tile .v small { font-size: 14px; font-weight: 600; color: var(--ink-2); margin-left: 3px; }
+  .tile .sub { color: var(--ink-2); font-size: 12px; margin-top: 2px; }
+
+  .grid.two { grid-template-columns: 1fr 1fr; margin-top: 16px; }
+  .card-head { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+  .card-head svg { width: 20px; height: 20px; color: var(--sun); flex: none; }
+  .card-head h2 { margin: 0; font-size: 16px; flex: 1; }
+  .pill { font-size: 12px; font-weight: 700; border-radius: 999px; padding: 4px 10px; background: var(--bg-2); color: var(--ink-2); border: 1px solid var(--card-line); }
+  .pill:empty { display: none; }
+  .pill.safe, .pill.now, .pill.later, .pill.returned { color: #062a1b; background: var(--safe); border-color: var(--safe); }
+  .pill.caution, .pill.at_sea { color: #2b1d00; background: var(--caution); border-color: var(--caution); }
+  .pill.danger, .pill.none, .pill.overdue { color: #fff; background: var(--danger); border-color: var(--danger); }
+  .best-text, .trip-text { font-size: 17px; font-weight: 600; line-height: 1.5; margin: 4px 0 14px; }
+  .strip { display: grid; grid-template-columns: repeat(24, 1fr); gap: 2px; height: 26px; }
+  .strip i { border-radius: 3px; background: var(--card-line); }
+  .strip i.safe { background: var(--safe); } .strip i.caution { background: var(--caution); } .strip i.danger { background: var(--danger); }
+  .strip i.pick { box-shadow: 0 0 0 2px var(--ink); }
+  .strip-axis { display: flex; justify-content: space-between; color: var(--ink-3); font-size: 11.5px; margin-top: 6px; }
+  .legend { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 10px; color: var(--ink-2); font-size: 12.5px; }
+  .legend > span { display: inline-flex; align-items: center; gap: 6px; }
+  .sw { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
+  .sw.safe { background: var(--safe); } .sw.caution { background: var(--caution); } .sw.danger { background: var(--danger); }
+  .trip .help { color: var(--ink-2); font-size: 14px; line-height: 1.5; margin: 0 0 14px; }
+  .trip-row { display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap; }
+  .trip-row label { display: block; font-size: 13px; font-weight: 600; color: var(--ink-2); margin-bottom: 6px; }
+  .trip-row input { font: inherit; font-size: 16px; color: var(--ink); background: var(--bg-2); border: 1px solid var(--card-line); border-radius: 12px; padding: 10px 12px; color-scheme: dark; }
+  .warn { background: #3a1418; border: 1px solid var(--danger); color: #ffd1d2; border-radius: 12px; padding: 12px 14px; font-weight: 600; font-size: 14.5px; line-height: 1.5; margin-bottom: 12px; display: flex; gap: 10px; }
+  .warn::before { content: ""; flex: none; width: 18px; height: 18px; margin-top: 2px; background: var(--danger); -webkit-mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path d='M12 2 1 21h22zm0 6 1 7h-2zm0 9a1.2 1.2 0 1 1 0 2.4A1.2 1.2 0 0 1 12 17z'/></svg>") center/contain no-repeat; mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path d='M12 2 1 21h22zm0 6 1 7h-2zm0 9a1.2 1.2 0 1 1 0 2.4A1.2 1.2 0 0 1 12 17z'/></svg>") center/contain no-repeat; }
+  .trip.overdue { border-color: var(--danger); }
+  .chart-card { margin-top: 16px; }
+  .chart-card h2, .say h2 { margin: 0 0 4px; font-size: 16px; }
+  .chart-title { color: var(--ink-2); font-size: 13px; font-weight: 600; margin: 14px 0 4px; }
+  svg.chart { width: 100%; height: auto; display: block; }
+
+  .say { margin-top: 16px; }
+  .say p { font-size: 17px; line-height: 1.7; margin: 8px 0 0; }
+  .say p.speaking { color: var(--sun); }
+
+  footer { margin-top: 18px; color: var(--ink-3); font-size: 12px; line-height: 1.6; }
+  .live-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--safe); margin-right: 6px; vertical-align: middle; box-shadow: 0 0 0 3px color-mix(in srgb, var(--safe) 30%, transparent); }
+
+  .toast { position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); background: #22140a; color: #ffd9a8; border: 1px solid #7a4a12; padding: 12px 16px; border-radius: 12px; font-size: 14px; max-width: calc(100% - 32px); display: none; }
+  .toast.show { display: block; }
+
+  .loading .level-word, .loading .tile .v { color: transparent; background: var(--card-line); border-radius: 8px; }
+  .loading { opacity: .75; transition: opacity var(--t-fast); }
+  .error-box { display: none; margin-top: 16px; border: 1px solid var(--danger); color: #ffd1d2; background: #3a1418; border-radius: 14px; padding: 12px 12px 12px 16px; align-items: center; justify-content: space-between; gap: 12px; }
+  .error-box.show { display: flex; }
+  .btn.small { padding: 8px 14px; font-size: 14px; }
+
+  /* account button + dialog */
+  .account-btn { display: flex; align-items: center; gap: 10px; font: inherit; color: var(--ink); background: none; border: 0; border-radius: 999px; padding: 0 6px 0 0; cursor: pointer; }
+  .gear { width: 16px; height: 16px; color: var(--ink-3); }
+  .account-btn:hover .gear { color: var(--ink); }
+  dialog { width: min(520px, calc(100% - 32px)); background: var(--card); color: var(--ink); border: 1px solid var(--card-line); border-radius: 18px; padding: 22px; box-shadow: 0 30px 80px rgba(0,0,0,.5); }
+  dialog::backdrop { background: rgba(3,10,20,.7); }
+  .dlg-head { display: flex; justify-content: space-between; align-items: center; margin: 0; }
+  .dlg-head h2 { margin: 0; font-size: 20px; }
+  .icon-btn { background: var(--bg-2); border: 1px solid var(--card-line); color: var(--ink-2); border-radius: 10px; width: 36px; height: 36px; display: grid; place-items: center; cursor: pointer; }
+  .icon-btn svg { width: 18px; height: 18px; }
+  .dlg-sub { color: var(--ink-2); margin: 6px 0 4px; font-size: 14px; }
+  .dlg-sec { border-top: 1px solid var(--card-line); margin-top: 18px; padding-top: 16px; }
+  .dlg-sec h3 { margin: 0 0 12px; font-size: 15px; }
+  .dlg-sec label { display: block; font-size: 13px; font-weight: 600; color: var(--ink-2); margin: 0 0 6px; }
+  .dlg-sec input[type=password] { width: 100%; font: inherit; font-size: 16px; color: var(--ink); background: var(--bg-2); border: 1px solid var(--card-line); border-radius: 12px; padding: 11px 12px; letter-spacing: .3em; margin-bottom: 10px; }
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .help { color: var(--ink-2); font-size: 13px; margin: -4px 0 12px; line-height: 1.5; }
+  .check { display: flex !important; gap: 8px; align-items: center; font-weight: 500 !important; color: var(--ink) !important; margin: 4px 0 12px !important; cursor: pointer; }
+  .check input { width: 18px; height: 18px; accent-color: var(--danger); }
+  .msg { min-height: 1.2em; font-size: 13px; margin: 0 0 10px; }
+  .msg.ok { color: var(--safe); } .msg.err { color: #ffb4b6; }
+  .btn.danger { background: var(--danger); border-color: var(--danger); color: #fff; }
+  .btn:disabled { opacity: .5; cursor: not-allowed; }
+  .danger-zone h3 { color: #ffb4b6; }
+
+  footer { display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+  .foot-links { display: flex; gap: 16px; }
+  .foot-links a { color: var(--ink-2); text-decoration: none; font-weight: 600; }
+  .foot-links a:hover { color: var(--ink); text-decoration: underline; }
+
+  /* keyboard focus + motion preferences */
+  :focus-visible { outline: 3px solid var(--sun); outline-offset: 2px; border-radius: 8px; }
+  button:focus:not(:focus-visible) { outline: none; }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+  @media (max-width: 520px) { .row2 { grid-template-columns: 1fr; } .uname { max-width: 90px; } }
+
+  @media (max-width: 760px) {
+    .grid, .grid.two { grid-template-columns: 1fr; }
+    .level-word { font-size: 36px; }
+  }
+</style>
+</head>
+<body data-level="none">
+<div class="wrap">
+  <header>
+    <div class="brand">
+      <svg class="logo" viewBox="0 0 44 44" aria-hidden="true">
+        <circle cx="30" cy="16" r="8" fill="#ffc857"/>
+        <path d="M2 28c5 0 5-4 10-4s5 4 10 4 5-4 10-4 5 4 10 4v14H2z" fill="#2a7fc9"/>
+        <path d="M2 34c5 0 5-4 10-4s5 4 10 4 5-4 10-4 5 4 10 4v8H2z" fill="#1a5c99"/>
+      </svg>
+      <div>
+        <h1>SeaSense</h1>
+        <p data-t="tagline">Spoken sea-safety briefings for coastal fishermen</p>
+      </div>
+    </div>
+    <div class="head-right">
+      <div class="seg" role="group" aria-label="Language" id="langs">
+        <button data-lang="en">English</button>
+        <button data-lang="ta">தமிழ்</button>
+        <button data-lang="hi">हिन्दी</button>
+      </div>
+      <div class="user">
+        <button class="account-btn" id="accountBtn" aria-haspopup="dialog">
+          <span class="avatar" id="avatar" aria-hidden="true">?</span>
+          <span class="uname" id="uname"></span>
+          <svg class="gear" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 0 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 0 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 0 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 0 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+        </button>
+        <button class="signout" id="signout" data-t="signout">Sign out</button>
+      </div>
+    </div>
+  </header>
+
+  <div class="greet"><span id="greeting">&nbsp;</span> <span class="saved" id="saved" data-t="saved">Saved to your profile</span></div>
+
+  <div class="label" data-t="zone">Fishing zone</div>
+  <div class="zones" id="zones"></div>
+
+  <div class="error-box" id="error" role="alert">
+    <span id="errorText"></span>
+    <button class="btn small" id="retry" data-t="retry">Try again</button>
+  </div>
+
+  <div class="grid" id="main">
+    <section class="card verdict" aria-live="polite" aria-atomic="true">
+      <div class="small" data-t="risk_label">Trip risk · next 12 hours</div>
+      <div class="zone-name" id="zoneName">&nbsp;</div>
+      <div class="level-word" id="levelWord">&nbsp;</div>
+      <div class="reason" id="reason">&nbsp;</div>
+      <div class="advice" id="advice">&nbsp;</div>
+      <div class="actions">
+        <button class="btn primary" id="listen">
+          <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 10v4h4l5 4V6L7 10H3zm13.5 2a4.5 4.5 0 0 0-2.5-4v8a4.5 4.5 0 0 0 2.5-4zM14 3.2v2.1a7 7 0 0 1 0 13.4v2.1a9 9 0 0 0 0-17.6z"/></svg>
+          <span data-t="listen">Listen</span>
+        </button>
+        <button class="btn" id="refresh">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7"/></svg>
+          <span data-t="refresh">Refresh</span>
+        </button>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="tiles">
+        <div class="tile"><div class="k" data-t="wave_now">Waves now</div><div class="v" id="mWaveNow">–</div></div>
+        <div class="tile"><div class="k" data-t="wave_max">Highest wave</div><div class="v" id="mWaveMax">–</div></div>
+        <div class="tile"><div class="k" data-t="gust_max">Strongest gust</div><div class="v" id="mGust">–</div><div class="sub" id="mGustAt">&nbsp;</div></div>
+        <div class="tile"><div class="k" data-t="rain">Rain chance</div><div class="v" id="mRain">–</div></div>
+        <div class="tile"><div class="k" data-t="wind">Wind now</div><div class="v" id="mWind">–</div></div>
+        <div class="tile"><div class="k" data-t="updated">Updated</div><div class="v" id="mUpdated" style="font-size:22px">–</div><div class="sub" data-t="live">Live forecast</div></div>
+      </div>
+    </section>
+  </div>
+
+  <div class="grid two">
+    <section class="card best" aria-live="polite">
+      <div class="card-head">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2.5M9 2h6"/></svg>
+        <h2 data-t="best_title">Best time to go</h2>
+        <span class="pill" id="bestPill"></span>
+      </div>
+      <p class="best-text" id="bestText">&nbsp;</p>
+      <div class="strip" id="strip" role="img"></div>
+      <div class="strip-axis" id="stripAxis"></div>
+      <div class="legend">
+        <span><i class="sw safe"></i><span data-t="lg_safe">Safe</span></span>
+        <span><i class="sw caution"></i><span data-t="lg_caution">Caution</span></span>
+        <span><i class="sw danger"></i><span data-t="lg_danger">Don't go</span></span>
+      </div>
+    </section>
+
+    <section class="card trip" id="tripCard">
+      <div class="card-head">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 17h18l-2 3H5zM12 3v11M12 3l6 9h-6"/></svg>
+        <h2 data-t="trip_title">My trip</h2>
+        <span class="pill" id="tripPill"></span>
+      </div>
+
+      <form id="tripForm" novalidate>
+        <p class="help" data-t="trip_help">Going to sea? Log your trip so your family can check you're back. SeaSense warns you if the sea gets worse after you leave.</p>
+        <div class="trip-row">
+          <div>
+            <label for="backBy" data-t="back_by">Back by</label>
+            <input id="backBy" type="time" required>
+          </div>
+          <button class="btn primary" type="submit" data-t="start_trip">Start trip</button>
+        </div>
+        <p class="msg err" id="tripMsg" role="status"></p>
+      </form>
+
+      <div id="tripActive" hidden>
+        <div class="warn" id="tripWarn" role="alert" hidden></div>
+        <p class="trip-text" id="tripText"></p>
+        <div class="actions">
+          <button class="btn primary" id="tripEnd">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7"/></svg>
+            <span data-t="im_back">I'm back</span>
+          </button>
+          <button class="btn" id="tripShare">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg>
+            <span data-t="copy_link">Copy family link</span>
+          </button>
+        </div>
+      </div>
+
+      <div id="tripDone" hidden>
+        <p class="trip-text" id="tripDoneText"></p>
+        <button class="btn" id="tripNew" data-t="new_trip">Log a new trip</button>
+      </div>
+    </section>
+  </div>
+
+  <section class="card chart-card">
+    <h2 data-t="chart_title">Next 12 hours</h2>
+    <div class="chart-title" data-t="waves_m">Wave height (m)</div>
+    <svg class="chart" id="waveChart" viewBox="0 0 640 170" role="img" aria-label="Wave height for the next 12 hours"></svg>
+    <div class="chart-title" data-t="gusts">Wind gusts (km/h)</div>
+    <svg class="chart" id="gustChart" viewBox="0 0 640 170" role="img" aria-label="Wind gusts for the next 12 hours"></svg>
+  </section>
+
+  <section class="card say">
+    <h2 data-t="says">What SeaSense says</h2>
+    <p id="briefing">&nbsp;</p>
+  </section>
+
+  <footer>
+    <div>
+      <span class="live-dot" aria-hidden="true"></span><span id="source" data-t="source">Live forecast from Open-Meteo Marine and Forecast APIs.</span><br>
+      <span data-t="disclaimer">Demo thresholds, not official IMD guidance. Always follow IMD and INCOIS warnings.</span>
+    </div>
+    <nav class="foot-links" aria-label="Footer">
+      <a href="/board" target="_blank" rel="noopener" data-t="board_link">Harbour board (TV)</a>
+      <a href="https://open-meteo.com/" target="_blank" rel="noopener" data-t="data_link">Data: Open-Meteo</a>
+      <a href="https://github.com/kanisha0729/seasense" target="_blank" rel="noopener" data-t="code_link">Source code</a>
+    </nav>
+  </footer>
+</div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<dialog id="account" aria-labelledby="accTitle">
+  <form method="dialog" class="dlg-head">
+    <h2 id="accTitle" data-t="account">Account</h2>
+    <button class="icon-btn" aria-label="Close" data-t-label="close">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+    </button>
+  </form>
+  <p class="dlg-sub"><span data-t="signed_in_as">Signed in as</span> <b id="accName"></b></p>
+
+  <section class="dlg-sec">
+    <h3 data-t="change_pin">Change PIN</h3>
+    <form id="pinForm" novalidate>
+      <div class="row2">
+        <div><label for="curPin" data-t="current_pin">Current PIN</label>
+          <input id="curPin" type="password" inputmode="numeric" maxlength="6" autocomplete="current-password" required></div>
+        <div><label for="newPin" data-t="new_pin">New PIN (4–6 digits)</label>
+          <input id="newPin" type="password" inputmode="numeric" maxlength="6" autocomplete="new-password" required></div>
+      </div>
+      <p class="msg" id="pinMsg" role="status"></p>
+      <button class="btn primary" type="submit" data-t="save_pin">Update PIN</button>
+    </form>
+  </section>
+
+  <section class="dlg-sec danger-zone">
+    <h3 data-t="delete_title">Delete account</h3>
+    <p class="help" data-t="delete_help">This removes your name, zone, language and PIN. It can't be undone.</p>
+    <form id="delForm" novalidate>
+      <label for="delPin" data-t="current_pin">Current PIN</label>
+      <input id="delPin" type="password" inputmode="numeric" maxlength="6" autocomplete="current-password" required>
+      <label class="check"><input type="checkbox" id="delConfirm"> <span data-t="confirm_delete">I understand, delete my account</span></label>
+      <p class="msg" id="delMsg" role="status"></p>
+      <button class="btn danger" type="submit" id="delBtn" disabled data-t="delete_btn">Delete my account</button>
+    </form>
+  </section>
+</dialog>
+
+<script>
+const UI = {
+  en: { tagline: "Spoken sea-safety briefings for coastal fishermen", zone: "Fishing zone",
+        risk_label: "Trip risk · next 12 hours", listen: "Listen", stop: "Stop", refresh: "Refresh",
+        wave_now: "Waves now", wave_max: "Highest wave", gust_max: "Strongest gust", rain: "Rain chance",
+        wind: "Wind now", updated: "Updated", live: "Live forecast", around: "around",
+        chart_title: "Next 12 hours", waves_m: "Wave height (m)", gusts: "Wind gusts (km/h)",
+        says: "What SeaSense says", source: "Live forecast from Open-Meteo Marine and Forecast APIs.",
+        disclaimer: "Demo thresholds, not official IMD guidance. Always follow IMD and INCOIS warnings.",
+        caution: "caution", danger: "danger", loading: "Getting the live forecast…",
+        signout: "Sign out", saved: "✓ Saved to your profile",
+        morning: "Good morning", afternoon: "Good afternoon", evening: "Good evening",
+        board_link: "Harbour board (TV)", retry: "Try again", data_link: "Data: Open-Meteo", code_link: "Source code", offline: "Couldn't reach SeaSense. Check that web.py is running.",
+        account: "Account", close: "Close", signed_in_as: "Signed in as", change_pin: "Change PIN", current_pin: "Current PIN",
+        new_pin: "New PIN (4–6 digits)", save_pin: "Update PIN", pin_changed: "PIN updated.", wrong_pin: "That PIN is wrong.",
+        bad_pin: "Your new PIN must be 4 to 6 digits.", delete_title: "Delete account",
+        delete_help: "This removes your name, zone, language and PIN. It can't be undone.",
+        confirm_delete: "I understand, delete my account", delete_btn: "Delete my account",
+        best_title: "Best time to go", lg_safe: "Safe", lg_caution: "Caution", lg_danger: "Don't go",
+        best_pill: { now: "Safe now", later: "Safe window ahead", caution: "Caution only", none: "No safe window" },
+        trip_title: "My trip", trip_help: "Going to sea? Log your trip so your family can check you're back. SeaSense warns you if the sea gets worse after you leave.",
+        back_by: "Back by", start_trip: "Start trip", im_back: "I'm back", copy_link: "Copy family link", new_trip: "Log a new trip",
+        link_copied: "Family link copied. Send it to your family on WhatsApp.",
+        trip_pill: { at_sea: "At sea", overdue: "Overdue", returned: "Back" }, now_label: "now", in24: "+24 h",
+        novoice: "This device has no English voice installed.", m: "m", kmh: "km/h" },
+  ta: { tagline: "கடற்கரை மீனவர்களுக்கான குரல் வழி கடல் பாதுகாப்பு அறிக்கை", zone: "மீன்பிடி பகுதி",
+        risk_label: "பயண அபாயம் · அடுத்த 12 மணி நேரம்", listen: "கேளுங்கள்", stop: "நிறுத்து", refresh: "புதுப்பி",
+        wave_now: "தற்போதைய அலை", wave_max: "அதிகபட்ச அலை", gust_max: "பலத்த காற்று", rain: "மழை வாய்ப்பு",
+        wind: "தற்போதைய காற்று", updated: "புதுப்பித்தது", live: "நேரடி முன்னறிவிப்பு", around: "சுமார்",
+        chart_title: "அடுத்த 12 மணி நேரம்", waves_m: "அலை உயரம் (மீ)", gusts: "காற்றின் வேகம் (கி.மீ/மணி)",
+        says: "SeaSense சொல்வது", source: "Open-Meteo கடல் மற்றும் வானிலை API-களின் நேரடி முன்னறிவிப்பு.",
+        disclaimer: "இவை டெமோ வரம்புகள், அதிகாரப்பூர்வ IMD வழிகாட்டுதல் அல்ல. IMD மற்றும் INCOIS எச்சரிக்கைகளை எப்போதும் பின்பற்றுங்கள்.",
+        caution: "எச்சரிக்கை", danger: "அபாயம்", loading: "நேரடி முன்னறிவிப்பைப் பெறுகிறது…",
+        signout: "வெளியேறு", saved: "✓ உங்கள் சுயவிவரத்தில் சேமிக்கப்பட்டது",
+        morning: "காலை வணக்கம்", afternoon: "மதிய வணக்கம்", evening: "மாலை வணக்கம்",
+        board_link: "துறைமுகப் பலகை (TV)", retry: "மீண்டும் முயல்", data_link: "தரவு: Open-Meteo", code_link: "மூலக் குறியீடு", offline: "SeaSense-ஐ அணுக முடியவில்லை. web.py இயங்குகிறதா எனப் பாருங்கள்.",
+        account: "கணக்கு", close: "மூடு", signed_in_as: "உள்நுழைந்தவர்:", change_pin: "PIN மாற்று", current_pin: "தற்போதைய PIN",
+        new_pin: "புதிய PIN (4–6 இலக்கங்கள்)", save_pin: "PIN-ஐப் புதுப்பி", pin_changed: "PIN புதுப்பிக்கப்பட்டது.", wrong_pin: "PIN தவறு.",
+        bad_pin: "புதிய PIN 4 முதல் 6 இலக்கங்களாக இருக்க வேண்டும்.", delete_title: "கணக்கை நீக்கு",
+        delete_help: "இது உங்கள் பெயர், பகுதி, மொழி, PIN அனைத்தையும் நீக்கும். மீட்டெடுக்க முடியாது.",
+        confirm_delete: "புரிந்தது, என் கணக்கை நீக்கு", delete_btn: "என் கணக்கை நீக்கு",
+        best_title: "புறப்பட சிறந்த நேரம்", lg_safe: "பாதுகாப்பானது", lg_caution: "எச்சரிக்கை", lg_danger: "செல்ல வேண்டாம்",
+        best_pill: { now: "இப்போது பாதுகாப்பானது", later: "பாதுகாப்பான நேரம் உண்டு", caution: "எச்சரிக்கை மட்டும்", none: "பாதுகாப்பான நேரம் இல்லை" },
+        trip_title: "என் பயணம்", trip_help: "கடலுக்குச் செல்கிறீர்களா? உங்கள் பயணத்தைப் பதிவு செய்யுங்கள், நீங்கள் திரும்பிவிட்டீர்களா என குடும்பத்தினர் பார்க்கலாம். நீங்கள் புறப்பட்ட பிறகு கடல் நிலை மோசமானால் SeaSense எச்சரிக்கும்.",
+        back_by: "திரும்பும் நேரம்", start_trip: "பயணத்தைத் தொடங்கு", im_back: "திரும்பிவிட்டேன்", copy_link: "குடும்ப இணைப்பை நகலெடு", new_trip: "புதிய பயணம் பதிவு செய்",
+        link_copied: "குடும்ப இணைப்பு நகலெடுக்கப்பட்டது. WhatsApp-இல் குடும்பத்தினருக்கு அனுப்புங்கள்.",
+        trip_pill: { at_sea: "கடலில்", overdue: "தாமதம்", returned: "திரும்பினார்" }, now_label: "இப்போது", in24: "+24 மணி",
+        novoice: "இந்தச் சாதனத்தில் தமிழ் குரல் இல்லை. தமிழில் கேட்க SeaSense-ஐ Microsoft Edge-இல் திறக்கவும்.", m: "மீ", kmh: "கி.மீ/மணி" },
+  hi: { tagline: "तटीय मछुआरों के लिए बोलकर दी जाने वाली समुद्री सुरक्षा रिपोर्ट", zone: "मछली पकड़ने का क्षेत्र",
+        risk_label: "यात्रा जोखिम · अगले 12 घंटे", listen: "सुनें", stop: "रोकें", refresh: "रीफ़्रेश",
+        wave_now: "अभी की लहर", wave_max: "सबसे ऊँची लहर", gust_max: "सबसे तेज़ झोंका", rain: "बारिश की संभावना",
+        wind: "अभी की हवा", updated: "अपडेट", live: "लाइव पूर्वानुमान", around: "लगभग",
+        chart_title: "अगले 12 घंटे", waves_m: "लहर की ऊँचाई (मी)", gusts: "हवा के झोंके (किमी/घं)",
+        says: "SeaSense क्या कहता है", source: "Open-Meteo Marine और Forecast API का लाइव पूर्वानुमान।",
+        disclaimer: "ये डेमो सीमाएँ हैं, आधिकारिक IMD मार्गदर्शन नहीं। हमेशा IMD और INCOIS की चेतावनियों का पालन करें।",
+        caution: "सावधान", danger: "ख़तरा", loading: "लाइव पूर्वानुमान लाया जा रहा है…",
+        signout: "साइन आउट", saved: "✓ आपकी प्रोफ़ाइल में सेव हो गया",
+        morning: "सुप्रभात", afternoon: "नमस्ते", evening: "शुभ संध्या",
+        board_link: "हार्बर बोर्ड (TV)", retry: "फिर कोशिश करें", data_link: "डेटा: Open-Meteo", code_link: "सोर्स कोड", offline: "SeaSense से जुड़ नहीं पाए। देखें कि web.py चल रहा है।",
+        account: "खाता", close: "बंद करें", signed_in_as: "साइन इन:", change_pin: "PIN बदलें", current_pin: "मौजूदा PIN",
+        new_pin: "नया PIN (4–6 अंक)", save_pin: "PIN अपडेट करें", pin_changed: "PIN अपडेट हो गया।", wrong_pin: "PIN गलत है।",
+        bad_pin: "नया PIN 4 से 6 अंकों का होना चाहिए।", delete_title: "खाता हटाएँ",
+        delete_help: "इससे आपका नाम, क्षेत्र, भाषा और PIN हट जाएँगे। इसे वापस नहीं किया जा सकता।",
+        confirm_delete: "समझ लिया, मेरा खाता हटाएँ", delete_btn: "मेरा खाता हटाएँ",
+        best_title: "निकलने का सबसे अच्छा समय", lg_safe: "सुरक्षित", lg_caution: "सावधान", lg_danger: "न जाएँ",
+        best_pill: { now: "अभी सुरक्षित", later: "आगे सुरक्षित समय", caution: "सिर्फ़ सावधान", none: "सुरक्षित समय नहीं" },
+        trip_title: "मेरी यात्रा", trip_help: "समुद्र में जा रहे हैं? अपनी यात्रा दर्ज करें ताकि परिवार देख सके कि आप लौटे या नहीं। निकलने के बाद समुद्र बिगड़ा तो SeaSense चेतावनी देगा।",
+        back_by: "लौटने का समय", start_trip: "यात्रा शुरू करें", im_back: "मैं लौट आया", copy_link: "परिवार लिंक कॉपी करें", new_trip: "नई यात्रा दर्ज करें",
+        link_copied: "परिवार लिंक कॉपी हो गया। WhatsApp पर परिवार को भेजें।",
+        trip_pill: { at_sea: "समुद्र में", overdue: "देरी", returned: "लौट आए" }, now_label: "अभी", in24: "+24 घं",
+        novoice: "इस डिवाइस पर हिन्दी आवाज़ नहीं है। सुनने के लिए SeaSense को Microsoft Edge में खोलें।", m: "मी", kmh: "किमी/घं" },
+};
+const SPEECH_LANG = { en: "en-IN", ta: "ta-IN", hi: "hi-IN" };
+const COLORS = { safe: "#2ecc8f", caution: "#ffb020", danger: "#ff5a5f" };
+
+const store = {
+  get(k, d) { try { return localStorage.getItem(k) || d; } catch { return d; } },
+  set(k, v) { try { localStorage.setItem(k, v); } catch {} },
+};
+
+let lang = store.get("seasense-lang", "en");
+let zone = store.get("seasense-zone", "rameswaram");
+let zones = [];
+let report = null;
+let me = null;
+
+async function api(url, options = {}) {
+  const res = await fetch(url, { headers: { "Content-Type": "application/json" }, ...options });
+  if (res.status === 401) { location.href = "/login"; throw new Error("signed_out"); }
+  return res;
+}
+let savedTimer;
+async function saveProfile() {
+  try {
+    await api("/api/me", { method: "PATCH", body: JSON.stringify({ zone, lang }) });
+    $("saved").classList.add("show");
+    clearTimeout(savedTimer);
+    savedTimer = setTimeout(() => $("saved").classList.remove("show"), 2200);
+  } catch {}
+}
+function greet() {
+  if (!me) return;
+  const h = Number(new Date().toLocaleString("en-GB", { hour: "2-digit", hour12: false, timeZone: "Asia/Kolkata" }));
+  const word = h < 12 ? UI[lang].morning : h < 17 ? UI[lang].afternoon : UI[lang].evening;
+  $("greeting").textContent = `${word}, ${me.name}`;
+}
+
+const $ = (id) => document.getElementById(id);
+
+function hourLabel(iso) { return timeLabel(iso); }
+function timeLabel(iso) {
+  return new Date(iso).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Kolkata" });
+}
+
+function applyUI() {
+  document.documentElement.lang = lang;
+  document.querySelectorAll("[data-t]").forEach((el) => {
+    const key = el.dataset.t;
+    if (UI[lang][key]) el.textContent = UI[lang][key];
+  });
+  document.querySelectorAll("[data-t-label]").forEach((el) => el.setAttribute("aria-label", UI[lang][el.dataset.tLabel]));
+  $("accountBtn").setAttribute("aria-label", `${UI[lang].account}: ${me ? me.name : ""}`);
+  document.querySelectorAll("#langs button").forEach((b) => b.setAttribute("aria-pressed", b.dataset.lang === lang));
+  greet();
+  $("zones").innerHTML = "";
+  zones.forEach((z) => {
+    const b = document.createElement("button");
+    b.textContent = z.names[lang] || z.names.en;
+    b.setAttribute("aria-pressed", z.key === zone);
+    b.onclick = () => { zone = z.key; store.set("seasense-zone", zone); stopSpeaking(); applyUI(); load(); saveProfile(); };
+    $("zones").appendChild(b);
+  });
+}
+
+function barChart(svg, hours, field, cautionAt, dangerAt, floorMax, unit) {
+  const W = Math.max(300, Math.round(svg.getBoundingClientRect().width || 640));
+  const H = 170, left = 34, right = 8, top = 16, bottom = 26;
+  svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+  const vals = hours.map((h) => h[field]);
+  const max = Math.max(floorMax, ...vals.filter((v) => v != null)) * 1.1;
+  const y = (v) => top + (H - top - bottom) * (1 - v / max);
+  const slot = (W - left - right) / hours.length;
+  const bw = Math.min(34, slot * 0.62);
+  const every = slot < 40 ? 3 : 2;
+  const color = (v) => v > dangerAt ? COLORS.danger : v >= cautionAt ? COLORS.caution : COLORS.safe;
+  let s = "";
+  [cautionAt, dangerAt].forEach((lim, i) => {
+    const c = i ? COLORS.danger : COLORS.caution;
+    s += `<line x1="${left}" x2="${W - right}" y1="${y(lim)}" y2="${y(lim)}" stroke="${c}" stroke-dasharray="4 4" stroke-width="1" opacity=".7"/>`;
+    s += `<text x="${left - 6}" y="${y(lim) + 4}" text-anchor="end" font-size="11" fill="${c}">${lim}</text>`;
+  });
+  s += `<line x1="${left}" x2="${W - right}" y1="${y(0)}" y2="${y(0)}" stroke="#1d4570"/>`;
+  hours.forEach((h, i) => {
+    const v = h[field];
+    const cx = left + slot * i + slot / 2;
+    if (v != null) {
+      s += `<rect x="${cx - bw / 2}" y="${y(v)}" width="${bw}" height="${y(0) - y(v)}" rx="4" fill="${color(v)}"><title>${hourLabel(h.time)} · ${v} ${unit}</title></rect>`;
+      s += `<text x="${cx}" y="${y(v) - 4}" text-anchor="middle" font-size="10.5" fill="#9fbfdd">${field === "wave" ? v.toFixed(1) : Math.round(v)}</text>`;
+    }
+    if (i % every === 0) s += `<text x="${cx}" y="${H - 8}" text-anchor="middle" font-size="11" fill="#6f93b5">${hourLabel(h.time)}</text>`;
+  });
+  svg.innerHTML = s;
+}
+
+function render() {
+  const r = report, m = r.metrics, u = UI[lang];
+  document.body.dataset.level = r.level;
+  $("zoneName").textContent = r.zone;
+  $("levelWord").textContent = r.level_word;
+  $("reason").textContent = r.reason.charAt(0).toUpperCase() + r.reason.slice(1);
+  $("advice").textContent = r.advice;
+  $("mWaveNow").innerHTML = `${m.wave_now.toFixed(1)}<small>${u.m}</small>`;
+  $("mWaveMax").innerHTML = `${m.wave_max.toFixed(1)}<small>${u.m}</small>`;
+  $("mGust").innerHTML = `${m.gust_max}<small>${u.kmh}</small>`;
+  $("mGustAt").textContent = `${u.around} ${timeLabel(m.gust_peak_time)}`;
+  $("mRain").innerHTML = `${m.rain_max}<small>%</small>`;
+  $("mWind").innerHTML = `${m.wind_now}<small>${u.kmh}</small>`;
+  $("mUpdated").textContent = timeLabel(r.fetched_at);
+  $("briefing").textContent = r.briefing;
+  barChart($("waveChart"), r.hours, "wave", 1.5, 2.5, 3, "m");
+  barChart($("gustChart"), r.hours, "gust", 30, 45, 50, "km/h");
+}
+
+/* A safety app must never show an old verdict next to a new zone,
+   so a failed load clears everything instead of leaving stale data. */
+function clearReport() {
+  report = null;
+  document.body.dataset.level = "none";
+  ["levelWord", "reason", "advice"].forEach((id) => { $(id).textContent = id === "levelWord" ? "—" : ""; });
+  ["mWaveNow", "mWaveMax", "mGust", "mRain", "mWind", "mUpdated"].forEach((id) => { $(id).textContent = "—"; });
+  $("mGustAt").innerHTML = "&nbsp;";
+  $("waveChart").innerHTML = ""; $("gustChart").innerHTML = "";
+  $("briefing").textContent = "";
+  $("bestText").innerHTML = "&nbsp;"; $("bestPill").textContent = ""; $("strip").innerHTML = ""; $("stripAxis").innerHTML = "";
+  const z = zones.find((x) => x.key === zone);
+  $("zoneName").textContent = z ? (z.names[lang] || z.names.en) : "";
+}
+
+let loadSeq = 0;
+async function load() {
+  const seq = ++loadSeq;                // ignore answers to older requests
+  $("error").classList.remove("show");
+  $("main").classList.add("loading");
+  $("main").setAttribute("aria-busy", "true");
+  $("briefing").textContent = UI[lang].loading;
+  try {
+    let res;
+    try { res = await api(`/api/report?zone=${encodeURIComponent(zone)}&lang=${lang}`); }
+    catch (e) { if (e.message === "signed_out") return; throw new Error(UI[lang].offline); }
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || UI[lang].offline);
+    if (seq !== loadSeq) return;
+    report = data;
+    render();
+    loadBest(seq);
+  } catch (e) {
+    if (seq !== loadSeq) return;
+    clearReport();
+    $("errorText").textContent = e.message;
+    $("error").classList.add("show");
+  } finally {
+    if (seq === loadSeq) { $("main").classList.remove("loading"); $("main").removeAttribute("aria-busy"); }
+  }
+}
+
+/* ---------- best time to go ---------- */
+async function loadBest(seq) {
+  try {
+    const res = await api(`/api/best?zone=${encodeURIComponent(zone)}&lang=${lang}`);
+    const b = await res.json();
+    if (seq !== loadSeq) return;
+    if (!res.ok) throw new Error(b.error);
+    const u = UI[lang];
+    $("bestText").textContent = b.text;
+    $("bestPill").textContent = u.best_pill[b.status];
+    $("bestPill").className = "pill " + b.status;
+    const pickStart = b.start ? Date.parse(b.start) : null, pickEnd = b.end ? Date.parse(b.end) : null;
+    $("strip").innerHTML = b.strip.map((h) => {
+      const t = Date.parse(h.time);
+      const pick = pickStart !== null && t >= pickStart && t < pickEnd ? " pick" : "";
+      const word = h.level ? u["lg_" + h.level] : "–";
+      return `<i class="${h.level || ""}${pick}" title="${timeLabel(h.time)} · ${word}"></i>`;
+    }).join("");
+    $("strip").setAttribute("aria-label", b.text);
+    const mid = b.strip[12];
+    $("stripAxis").innerHTML = `<span>${u.now_label}</span><span>${mid ? timeLabel(mid.time) : ""}</span><span>${u.in24}</span>`;
+  } catch (e) {
+    if (seq !== loadSeq || e.message === "signed_out") return;
+    $("bestText").textContent = e.message || UI[lang].offline;
+    $("bestPill").textContent = "";
+  }
+}
+
+/* ---------- trip check-in ---------- */
+let trip = null;
+function showTrip() {
+  const u = UI[lang], active = trip && trip.status !== "returned";
+  $("tripForm").hidden = !!trip;
+  $("tripActive").hidden = !active;
+  $("tripDone").hidden = !(trip && trip.status === "returned");
+  $("tripCard").classList.toggle("overdue", !!trip && trip.status === "overdue");
+  $("tripPill").textContent = trip ? u.trip_pill[trip.status] : "";
+  $("tripPill").className = "pill " + (trip ? trip.status : "");
+  if (!trip) return;
+  if (active) {
+    $("tripText").textContent = trip.text;
+    $("tripWarn").hidden = !trip.warning;
+    $("tripWarn").textContent = trip.warning;
+  } else {
+    $("tripDoneText").textContent = trip.text;
+  }
+}
+async function loadTrip() {
+  try {
+    const res = await api(`/api/trip?lang=${lang}`);
+    trip = (await res.json()).trip;
+    showTrip();
+  } catch {}
+}
+function defaultBackBy() {   // 8 hours from now, on the hour
+  const d = new Date(Date.now() + 8 * 3600e3);
+  $("backBy").value = `${String(d.getHours()).padStart(2, "0")}:00`;
+}
+$("tripForm").onsubmit = async (e) => {
+  e.preventDefault();
+  $("tripMsg").textContent = "";
+  const res = await api("/api/trip", { method: "POST", body: JSON.stringify({ zone, back_by: $("backBy").value, lang }) });
+  const data = await res.json();
+  if (!res.ok) { $("tripMsg").textContent = data.error; return; }
+  trip = data.trip; showTrip();
+};
+$("tripEnd").onclick = async () => {
+  const res = await api(`/api/trip/end?lang=${lang}`, { method: "POST" });
+  trip = (await res.json()).trip; showTrip();
+};
+$("tripNew").onclick = () => { trip = null; defaultBackBy(); showTrip(); };
+$("tripShare").onclick = async () => {
+  const link = `${location.origin}/trip/${trip.token}?lang=${lang}`;
+  try { await navigator.clipboard.writeText(link); toast(UI[lang].link_copied); }
+  catch { prompt("Copy this link:", link); }
+};
+setInterval(() => { if (trip && trip.status !== "returned") loadTrip(); }, 60_000);   // keep countdown + warning fresh
+
+/* ---------- voice ---------- */
+let speaking = false;
+function pickVoice(code) {
+  const voices = speechSynthesis.getVoices();
+  const base = code.slice(0, 2);
+  return voices.find((v) => v.lang === code && /natural|online|google/i.test(v.name))
+      || voices.find((v) => v.lang === code)
+      || voices.find((v) => v.lang.startsWith(base));
+}
+function stopSpeaking() {
+  if ("speechSynthesis" in window) speechSynthesis.cancel();
+  speaking = false;
+  $("briefing").classList.remove("speaking");
+  $("listen").querySelector("span").textContent = UI[lang].listen;
+}
+function toast(msg) {
+  $("toast").textContent = msg;
+  $("toast").classList.add("show");
+  setTimeout(() => $("toast").classList.remove("show"), 6000);
+}
+function voicesReady() {            // browsers load voices late; wait up to 1.5 s
+  return new Promise((resolve) => {
+    if (speechSynthesis.getVoices().length) return resolve();
+    const done = () => resolve();
+    speechSynthesis.addEventListener("voiceschanged", done, { once: true });
+    setTimeout(done, 1500);
+  });
+}
+async function speak() {
+  if (!report) return;
+  if (speaking) { stopSpeaking(); return; }
+  if (!("speechSynthesis" in window)) { toast(UI[lang].novoice); return; }
+  await voicesReady();
+  const voice = pickVoice(SPEECH_LANG[lang]);
+  if (!voice) { toast(UI[lang].novoice); return; }
+  const say = new SpeechSynthesisUtterance(report.briefing);
+  say.voice = voice; say.lang = voice.lang; say.rate = 0.95;
+  say.onend = say.onerror = stopSpeaking;
+  speaking = true;
+  $("briefing").classList.add("speaking");
+  $("listen").querySelector("span").textContent = UI[lang].stop;
+  speechSynthesis.speak(say);
+}
+if ("speechSynthesis" in window) speechSynthesis.onvoiceschanged = () => speechSynthesis.getVoices();
+
+/* ---------- start ---------- */
+document.querySelectorAll("#langs button").forEach((b) => {
+  b.onclick = () => { lang = b.dataset.lang; store.set("seasense-lang", lang); stopSpeaking(); applyUI(); load(); loadTrip(); saveProfile(); };
+});
+$("retry").onclick = () => load();
+
+/* ---------- account dialog ---------- */
+function msg(id, text, ok) { $(id).textContent = text; $(id).className = "msg " + (ok ? "ok" : "err"); }
+$("accountBtn").onclick = () => {
+  ["curPin", "newPin", "delPin"].forEach((id) => { $(id).value = ""; });
+  $("delConfirm").checked = false; $("delBtn").disabled = true;
+  msg("pinMsg", "", true); msg("delMsg", "", true);
+  $("accName").textContent = me ? me.name : "";
+  $("account").showModal();
+  $("curPin").focus();
+};
+["curPin", "newPin", "delPin"].forEach((id) => $(id).addEventListener("input", (e) => { e.target.value = e.target.value.replace(/\D/g, ""); }));
+$("delConfirm").onchange = () => { $("delBtn").disabled = !$("delConfirm").checked; };
+$("pinForm").onsubmit = async (e) => {
+  e.preventDefault();
+  if (!/^\d{4,6}$/.test($("newPin").value)) return msg("pinMsg", UI[lang].bad_pin);
+  const res = await api("/api/me/pin", { method: "POST", body: JSON.stringify({ pin: $("curPin").value, new_pin: $("newPin").value }) });
+  const data = await res.json();
+  if (!res.ok) return msg("pinMsg", UI[lang][data.error] || UI[lang].offline);
+  $("curPin").value = ""; $("newPin").value = "";
+  msg("pinMsg", UI[lang].pin_changed, true);
+};
+$("delForm").onsubmit = async (e) => {
+  e.preventDefault();
+  if (!$("delConfirm").checked) return;
+  const res = await api("/api/me", { method: "DELETE", body: JSON.stringify({ pin: $("delPin").value }) });
+  const data = await res.json();
+  if (!res.ok) return msg("delMsg", UI[lang][data.error] || UI[lang].offline);
+  stopSpeaking();
+  location.href = "/login";
+};
+
+$("signout").onclick = async () => {
+  stopSpeaking();
+  try { await fetch("/api/logout", { method: "POST" }); } catch {}
+  location.href = "/login";
+};
+$("listen").onclick = speak;
+$("refresh").onclick = () => { stopSpeaking(); load(); };
+let resizeTimer;
+window.addEventListener("resize", () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(() => report && render(), 150); });
+
+Promise.all([api("/api/me").then((r) => r.json()), fetch("/api/zones").then((r) => r.json())]).then(([user, d]) => {
+  me = user;
+  zone = user.zone; lang = user.lang;           // the profile decides, on every device
+  store.set("seasense-zone", zone); store.set("seasense-lang", lang);
+  $("uname").textContent = user.name;
+  $("avatar").textContent = user.name.trim().charAt(0).toUpperCase();
+  zones = d.zones;
+  if (!zones.some((z) => z.key === zone)) zone = zones[0].key;
+  applyUI();
+  load();
+  defaultBackBy();
+  loadTrip();
+}).catch(() => {});
+</script>
+</body>
+</html>

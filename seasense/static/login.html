@@ -1,0 +1,351 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sign in · SeaSense</title>
+<meta name="description" content="SeaSense gives coastal fishermen a live, spoken sea-safety briefing for their zone in Tamil, Hindi or English: waves, wind, rain and a clear Safe, Caution or Don't go.">
+<meta name="theme-color" content="#071a2e">
+<meta property="og:title" content="SeaSense: know the sea before you sail">
+<meta property="og:description" content="Live, spoken sea-safety briefings for coastal fishermen in Tamil, Hindi or English.">
+<meta property="og:type" content="website">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+Tamil:wght@400;600;700&family=Noto+Sans+Devanagari:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #071a2e; --bg-2: #0b2440; --card: #0f2d4d; --card-line: #1d4570;
+    --ink: #eaf4ff; --ink-2: #9fbfdd; --ink-3: #6f93b5;
+    --sun: #ffc857; --safe: #2ecc8f; --danger: #ff5a5f;
+    --font: "Inter", "Noto Sans Tamil", "Noto Sans Devanagari", system-ui, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body { background: var(--bg); color: var(--ink); font-family: var(--font); }
+
+  .page { display: grid; grid-template-columns: 1.1fr 1fr; min-height: 100vh; }
+
+  /* left: story panel */
+  .story {
+    position: relative; overflow: hidden; padding: 48px;
+    background: linear-gradient(180deg, #0a2a4d 0%, #0d3a66 55%, #0b4a7d 100%);
+    display: flex; flex-direction: column; justify-content: space-between;
+  }
+  .brand { display: flex; align-items: center; gap: 12px; position: relative; z-index: 2; }
+  .brand svg { width: 44px; height: 44px; }
+  .brand b { font-size: 26px; font-weight: 800; letter-spacing: -0.5px; }
+  .pitch { position: relative; z-index: 2; max-width: 460px; }
+  .pitch h1 { font-size: 40px; line-height: 1.15; margin: 0 0 14px; letter-spacing: -0.8px; }
+  .pitch h1 span { color: var(--sun); }
+  .pitch p { color: var(--ink-2); font-size: 16px; line-height: 1.6; margin: 0 0 26px; }
+  .points { list-style: none; padding: 0; margin: 0; display: grid; gap: 14px; }
+  .points li { display: flex; gap: 12px; align-items: flex-start; font-size: 15px; line-height: 1.45; }
+  .points .ic { flex: none; width: 32px; height: 32px; border-radius: 10px; background: rgba(255,255,255,.08); display: grid; place-items: center; }
+  .points .ic svg { width: 18px; height: 18px; }
+  .points small { display: block; color: var(--ink-2); font-size: 13px; }
+  .sea { position: absolute; left: 0; right: 0; bottom: 0; width: 100%; height: 220px; z-index: 1; }
+  .story .foot { position: relative; z-index: 2; color: rgba(234,244,255,.6); font-size: 12px; }
+
+  /* right: form */
+  .side { display: flex; flex-direction: column; padding: 32px 48px; }
+  .top { display: flex; justify-content: flex-end; }
+  .seg { display: inline-flex; background: var(--bg-2); border: 1px solid var(--card-line); border-radius: 999px; padding: 4px; }
+  .seg button { font: inherit; font-size: 14px; font-weight: 600; color: var(--ink-2); background: none; border: 0; border-radius: 999px; padding: 8px 14px; cursor: pointer; }
+  .seg button[aria-pressed="true"] { background: var(--sun); color: #1a1200; }
+
+  .form-wrap { flex: 1; display: flex; align-items: center; justify-content: center; }
+  .card { width: 100%; max-width: 400px; }
+  .card h2 { font-size: 28px; margin: 0 0 6px; letter-spacing: -0.4px; }
+  .card .sub { color: var(--ink-2); margin: 0 0 24px; font-size: 15px; }
+
+  .tabs { display: grid; grid-template-columns: 1fr 1fr; background: var(--bg-2); border: 1px solid var(--card-line); border-radius: 12px; padding: 4px; margin-bottom: 22px; }
+  .tabs button { font: inherit; font-weight: 700; font-size: 14px; color: var(--ink-2); background: none; border: 0; border-radius: 9px; padding: 10px; cursor: pointer; }
+  .tabs button[aria-selected="true"] { background: var(--card); color: var(--ink); box-shadow: 0 0 0 1px var(--card-line); }
+
+  label { display: block; font-size: 13px; font-weight: 600; color: var(--ink-2); margin: 0 0 6px; }
+  .field { margin-bottom: 16px; }
+  input, select {
+    width: 100%; font: inherit; font-size: 16px; color: var(--ink);
+    background: var(--card); border: 1px solid var(--card-line); border-radius: 12px; padding: 13px 14px; outline: none;
+  }
+  input:focus, select:focus { border-color: var(--sun); box-shadow: 0 0 0 3px rgba(255,200,87,.18); }
+  .pin-wrap { position: relative; }
+  .pin-wrap input { padding-right: 52px; letter-spacing: 0.3em; }
+  .eye { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); background: none; border: 0; color: var(--ink-3); cursor: pointer; padding: 8px; }
+  .eye svg { width: 20px; height: 20px; }
+  .hint { color: var(--ink-3); font-size: 12px; margin-top: 6px; }
+  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+  .submit { width: 100%; font: inherit; font-size: 16px; font-weight: 800; color: #1a1200; background: var(--sun); border: 0; border-radius: 12px; padding: 14px; cursor: pointer; margin-top: 6px; }
+  .submit:disabled { opacity: .6; cursor: wait; }
+  .error { display: none; background: #3a1418; border: 1px solid var(--danger); color: #ffd1d2; border-radius: 12px; padding: 11px 14px; font-size: 14px; margin-bottom: 16px; }
+  .error.show { display: block; }
+  .switch { text-align: center; color: var(--ink-2); font-size: 14px; margin-top: 18px; }
+  .switch button { font: inherit; color: var(--sun); font-weight: 700; background: none; border: 0; cursor: pointer; padding: 0; }
+  .note { color: var(--ink-3); font-size: 12px; text-align: center; margin-top: 26px; line-height: 1.5; }
+
+  [hidden] { display: none !important; }
+  :focus-visible { outline: 3px solid var(--sun); outline-offset: 2px; }
+  input:focus-visible, select:focus-visible { outline: none; }
+  button:focus:not(:focus-visible) { outline: none; }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+  @media (max-width: 900px) {
+    .page { grid-template-columns: 1fr; }
+    .story { padding: 28px 20px 140px; min-height: auto; }
+    .pitch { margin-top: 28px; }
+    .pitch h1 { font-size: 28px; }
+    .pitch p { margin-bottom: 0; }
+    .points, .story .foot { display: none; }
+    .sea { height: 130px; }
+    .side { padding: 20px 16px 32px; }
+    .top { justify-content: center; margin-bottom: 24px; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+  <aside class="story">
+    <div class="brand">
+      <svg viewBox="0 0 44 44" aria-hidden="true">
+        <circle cx="30" cy="16" r="8" fill="#ffc857"/>
+        <path d="M2 28c5 0 5-4 10-4s5 4 10 4 5-4 10-4 5 4 10 4v14H2z" fill="#2a7fc9"/>
+        <path d="M2 34c5 0 5-4 10-4s5 4 10 4 5-4 10-4 5 4 10 4v8H2z" fill="#1a5c99"/>
+      </svg>
+      <b>SeaSense</b>
+    </div>
+
+    <div class="pitch">
+      <h1 data-t="headline_html">Know the sea <span>before</span> you sail.</h1>
+      <p data-t="pitch">A live sea-safety briefing for your fishing zone, spoken in your language, every morning before you leave.</p>
+      <ul class="points">
+        <li><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="#ffc857" stroke-width="2"><path d="M2 15c3 0 3-3 6-3s3 3 6 3 3-3 6-3M2 20c3 0 3-3 6-3s3 3 6 3 3-3 6-3M12 3v6"/></svg></span>
+          <div><span data-t="p1">Live waves, wind and rain</span><small data-t="p1s">From the latest forecast, for the next 12 hours</small></div></li>
+        <li><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="#ffc857" stroke-width="2"><path d="M12 3l9 4v5c0 5-4 8-9 9-5-1-9-4-9-9V7z"/><path d="M8.5 12l2.5 2.5 4.5-5"/></svg></span>
+          <div><span data-t="p2">Safe, Caution or Don't go</span><small data-t="p2s">One clear answer and the reason behind it</small></div></li>
+        <li><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="#ffc857" stroke-width="2"><path d="M3 10v4h4l5 4V6L7 10H3z"/><path d="M16 9a4 4 0 0 1 0 6M19 6a8 8 0 0 1 0 12"/></svg></span>
+          <div><span data-t="p3">Spoken in Tamil, Hindi or English</span><small data-t="p3s">On the web, or by voice with Alexa+</small></div></li>
+      </ul>
+    </div>
+
+    <div class="foot" data-t="foot">Your account works on the web and by voice: the same zone, the same language.</div>
+
+    <svg class="sea" viewBox="0 0 800 220" preserveAspectRatio="xMidYMax slice" aria-hidden="true">
+      <circle cx="640" cy="70" r="46" fill="#ffc857" opacity=".9"/>
+      <g transform="translate(470 92)">
+        <path d="M0 26h70l-12 14H10z" fill="#e8eef5"/>
+        <rect x="30" y="8" width="18" height="18" rx="2" fill="#ff7a59"/>
+        <path d="M39 8V-14" stroke="#e8eef5" stroke-width="2"/>
+        <path d="M78 6c8 6 8 18 0 24M86 0c13 10 13 30 0 40" stroke="#ffc857" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+      </g>
+      <path d="M0 140c60 0 60-18 120-18s60 18 120 18 60-18 120-18 60 18 120 18 60-18 120-18 60 18 120 18 60-18 80-18v100H0z" fill="#1a6fb5" opacity=".75"/>
+      <path d="M0 168c60 0 60-16 120-16s60 16 120 16 60-16 120-16 60 16 120 16 60-16 120-16 60 16 120 16 60-16 80-16v70H0z" fill="#135a96"/>
+      <path d="M0 194c60 0 60-14 120-14s60 14 120 14 60-14 120-14 60 14 120 14 60-14 120-14 60 14 120 14 60-14 80-14v40H0z" fill="#0c4477"/>
+    </svg>
+  </aside>
+
+  <main class="side">
+    <div class="top">
+      <div class="seg" role="group" aria-label="Language" id="langs">
+        <button data-lang="en">English</button>
+        <button data-lang="ta">தமிழ்</button>
+        <button data-lang="hi">हिन्दी</button>
+      </div>
+    </div>
+
+    <div class="form-wrap">
+      <div class="card">
+        <h2 id="title" data-t="welcome">Welcome back</h2>
+        <p class="sub" id="subtitle" data-t="welcome_sub">Sign in to get today's sea briefing.</p>
+
+        <div class="tabs" role="tablist">
+          <button role="tab" id="tabLogin" aria-selected="true" data-t="signin">Sign in</button>
+          <button role="tab" id="tabSignup" aria-selected="false" data-t="create">Create account</button>
+        </div>
+
+        <div class="error" id="error" role="alert"></div>
+
+        <form id="form" novalidate>
+          <div class="field">
+            <label for="name" data-t="name">Your name</label>
+            <input id="name" autocomplete="username" maxlength="30" required>
+          </div>
+          <div class="field">
+            <label for="pin" data-t="pin">PIN</label>
+            <div class="pin-wrap">
+              <input id="pin" type="password" inputmode="numeric" autocomplete="current-password" maxlength="6" pattern="[0-9]*" required>
+              <button type="button" class="eye" id="eye" aria-label="Show PIN">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>
+              </button>
+            </div>
+            <div class="hint" data-t="pin_hint" id="pinHint" hidden>4 to 6 digits, easy for you to remember</div>
+          </div>
+          <div class="row" id="signupFields" hidden>
+            <div class="field">
+              <label for="zone" data-t="zone">Usual fishing zone</label>
+              <select id="zone"></select>
+            </div>
+            <div class="field">
+              <label for="lang" data-t="voice_lang">Briefing language</label>
+              <select id="lang">
+                <option value="en">English</option>
+                <option value="ta">தமிழ்</option>
+                <option value="hi">हिन्दी</option>
+              </select>
+            </div>
+          </div>
+          <button class="submit" id="submit" type="submit" data-t="signin">Sign in</button>
+        </form>
+
+        <div class="switch">
+          <span id="switchText" data-t="no_account">New to SeaSense?</span>
+          <button type="button" id="switchBtn" data-t="create">Create account</button>
+        </div>
+        <p class="note" data-t="privacy">Your PIN is stored securely as a one-way hash. SeaSense keeps only your name, zone and language.</p>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script>
+const UI = {
+  en: {
+    headline_html: 'Know the sea <span>before</span> you sail.',
+    pitch: "A live sea-safety briefing for your fishing zone, spoken in your language, every morning before you leave.",
+    p1: "Live waves, wind and rain", p1s: "From the latest forecast, for the next 12 hours",
+    p2: "Safe, Caution or Don't go", p2s: "One clear answer and the reason behind it",
+    p3: "Spoken in Tamil, Hindi or English", p3s: "On the web, or by voice with Alexa+",
+    foot: "Your account works on the web and by voice: the same zone, the same language.",
+    welcome: "Welcome back", welcome_sub: "Sign in to get today's sea briefing.",
+    join: "Create your account", join_sub: "Set it up once. Your zone and language are remembered.",
+    signin: "Sign in", create: "Create account", name: "Your name", pin: "PIN",
+    pin_hint: "4 to 6 digits, easy for you to remember", zone: "Usual fishing zone", voice_lang: "Briefing language",
+    no_account: "New to SeaSense?", have_account: "Already have an account?",
+    privacy: "Your PIN is stored securely as a one-way hash. SeaSense keeps only your name, zone and language.",
+    wait: "Please wait…",
+    errors: { bad_login: "That name and PIN don't match. Please try again.", name_taken: "That name already has an account. Sign in instead, or pick another name.",
+              bad_name: "Please enter your name (2 to 30 letters).", bad_pin: "Your PIN must be 4 to 6 digits.", bad_zone: "Please choose your fishing zone.",
+              network: "Couldn't reach SeaSense. Is web.py still running?",
+              too_many: "Too many wrong PINs. For your safety, try again in {m} minutes." },
+  },
+  ta: {
+    headline_html: 'கடலுக்குச் செல்லும் <span>முன்பே</span> கடலை அறியுங்கள்.',
+    pitch: "உங்கள் மீன்பிடி பகுதிக்கான நேரடி கடல் பாதுகாப்பு அறிக்கை, உங்கள் மொழியில், தினமும் காலையில் புறப்படும் முன்.",
+    p1: "நேரடி அலை, காற்று, மழை", p1s: "அடுத்த 12 மணி நேரத்திற்கான சமீபத்திய முன்னறிவிப்பு",
+    p2: "பாதுகாப்பானது, எச்சரிக்கை அல்லது செல்ல வேண்டாம்", p2s: "ஒரு தெளிவான பதிலும் அதன் காரணமும்",
+    p3: "தமிழ், இந்தி அல்லது ஆங்கிலத்தில் குரல்", p3s: "இணையத்தில் அல்லது Alexa+ மூலம் குரலில்",
+    foot: "உங்கள் கணக்கு இணையத்திலும் குரலிலும் வேலை செய்யும்: அதே பகுதி, அதே மொழி.",
+    welcome: "மீண்டும் வருக", welcome_sub: "இன்றைய கடல் நிலை அறிக்கையைப் பெற உள்நுழையுங்கள்.",
+    join: "உங்கள் கணக்கை உருவாக்குங்கள்", join_sub: "ஒருமுறை அமைத்தால் போதும். உங்கள் பகுதியும் மொழியும் நினைவில் வைக்கப்படும்.",
+    signin: "உள்நுழை", create: "கணக்கு உருவாக்கு", name: "உங்கள் பெயர்", pin: "PIN எண்",
+    pin_hint: "4 முதல் 6 இலக்கங்கள், நினைவில் வைக்க எளிதானது", zone: "வழக்கமான மீன்பிடி பகுதி", voice_lang: "அறிக்கை மொழி",
+    no_account: "SeaSense-க்கு புதியவரா?", have_account: "ஏற்கனவே கணக்கு உள்ளதா?",
+    privacy: "உங்கள் PIN பாதுகாப்பாக ஒருவழி ஹேஷ் ஆக சேமிக்கப்படும். உங்கள் பெயர், பகுதி, மொழி மட்டுமே வைக்கப்படும்.",
+    wait: "காத்திருக்கவும்…",
+    errors: { bad_login: "பெயரும் PIN-உம் பொருந்தவில்லை. மீண்டும் முயலுங்கள்.", name_taken: "இந்தப் பெயரில் ஏற்கனவே கணக்கு உள்ளது. உள்நுழையுங்கள் அல்லது வேறு பெயரைத் தேர்ந்தெடுங்கள்.",
+              bad_name: "உங்கள் பெயரை உள்ளிடுங்கள் (2 முதல் 30 எழுத்துகள்).", bad_pin: "PIN 4 முதல் 6 இலக்கங்களாக இருக்க வேண்டும்.", bad_zone: "உங்கள் மீன்பிடி பகுதியைத் தேர்ந்தெடுங்கள்.",
+              network: "SeaSense-ஐ அணுக முடியவில்லை. web.py இயங்குகிறதா?",
+              too_many: "பல முறை தவறான PIN. உங்கள் பாதுகாப்புக்காக {m} நிமிடங்கள் கழித்து மீண்டும் முயலுங்கள்." },
+  },
+  hi: {
+    headline_html: 'समुद्र में जाने से <span>पहले</span> समुद्र को जानें।',
+    pitch: "आपके मछली पकड़ने के क्षेत्र की लाइव समुद्री सुरक्षा रिपोर्ट, आपकी भाषा में, हर सुबह निकलने से पहले।",
+    p1: "लाइव लहरें, हवा और बारिश", p1s: "अगले 12 घंटों का ताज़ा पूर्वानुमान",
+    p2: "सुरक्षित, सावधान या न जाएँ", p2s: "एक साफ़ जवाब और उसकी वजह",
+    p3: "तमिल, हिन्दी या अंग्रेज़ी में आवाज़", p3s: "वेब पर, या Alexa+ के साथ आवाज़ से",
+    foot: "आपका खाता वेब और आवाज़ दोनों पर चलता है: वही क्षेत्र, वही भाषा।",
+    welcome: "फिर से स्वागत है", welcome_sub: "आज की समुद्री रिपोर्ट के लिए साइन इन करें।",
+    join: "अपना खाता बनाएँ", join_sub: "एक बार सेट करें। आपका क्षेत्र और भाषा याद रखी जाएगी।",
+    signin: "साइन इन", create: "खाता बनाएँ", name: "आपका नाम", pin: "PIN",
+    pin_hint: "4 से 6 अंक, जो आपको आसानी से याद रहें", zone: "आपका सामान्य क्षेत्र", voice_lang: "रिपोर्ट की भाषा",
+    no_account: "SeaSense पर नए हैं?", have_account: "पहले से खाता है?",
+    privacy: "आपका PIN सुरक्षित रूप से वन-वे हैश के रूप में रखा जाता है। SeaSense सिर्फ़ आपका नाम, क्षेत्र और भाषा रखता है।",
+    wait: "कृपया प्रतीक्षा करें…",
+    errors: { bad_login: "नाम और PIN मेल नहीं खाते। फिर से कोशिश करें।", name_taken: "इस नाम से पहले से खाता है। साइन इन करें या कोई और नाम चुनें।",
+              bad_name: "अपना नाम लिखें (2 से 30 अक्षर)।", bad_pin: "PIN 4 से 6 अंकों का होना चाहिए।", bad_zone: "अपना मछली पकड़ने का क्षेत्र चुनें।",
+              network: "SeaSense से जुड़ नहीं पाए। क्या web.py चल रहा है?",
+              too_many: "कई बार गलत PIN डाला गया। आपकी सुरक्षा के लिए {m} मिनट बाद फिर कोशिश करें।" },
+  },
+};
+
+const store = {
+  get(k, d) { try { return localStorage.getItem(k) || d; } catch { return d; } },
+  set(k, v) { try { localStorage.setItem(k, v); } catch {} },
+};
+const $ = (id) => document.getElementById(id);
+let lang = store.get("seasense-lang", "en");
+let mode = "login";
+let zones = [];
+
+function apply() {
+  const u = UI[lang];
+  document.documentElement.lang = lang;
+  document.querySelectorAll("[data-t]").forEach((el) => {
+    const k = el.dataset.t;
+    if (k.endsWith("_html")) el.innerHTML = u[k];
+    else if (u[k]) el.textContent = u[k];
+  });
+  document.querySelectorAll("#langs button").forEach((b) => b.setAttribute("aria-pressed", b.dataset.lang === lang));
+  const signup = mode === "signup";
+  $("title").textContent = signup ? u.join : u.welcome;
+  $("subtitle").textContent = signup ? u.join_sub : u.welcome_sub;
+  $("submit").textContent = signup ? u.create : u.signin;
+  $("switchText").textContent = signup ? u.have_account : u.no_account;
+  $("switchBtn").textContent = signup ? u.signin : u.create;
+  $("tabLogin").setAttribute("aria-selected", !signup);
+  $("tabSignup").setAttribute("aria-selected", signup);
+  $("signupFields").hidden = !signup;
+  $("pinHint").hidden = !signup;
+  $("pin").autocomplete = signup ? "new-password" : "current-password";
+  const picked = $("zone").value || "rameswaram";
+  $("zone").innerHTML = zones.map((z) => `<option value="${z.key}">${z.names[lang] || z.names.en}</option>`).join("");
+  $("zone").value = picked;
+  if (!signup) $("lang").value = lang;
+}
+
+function setMode(m) { mode = m; showError(""); apply(); $("name").focus(); }
+let retryMinutes = 10;
+function showError(code) {
+  const box = $("error");
+  box.textContent = code ? (UI[lang].errors[code] || UI[lang].errors.network).replace("{m}", retryMinutes) : "";
+  box.classList.toggle("show", !!code);
+}
+
+document.querySelectorAll("#langs button").forEach((b) => b.onclick = () => {
+  lang = b.dataset.lang; store.set("seasense-lang", lang); $("lang").value = lang; apply();
+});
+$("tabLogin").onclick = () => setMode("login");
+$("tabSignup").onclick = () => setMode("signup");
+$("switchBtn").onclick = () => setMode(mode === "login" ? "signup" : "login");
+$("eye").onclick = () => { $("pin").type = $("pin").type === "password" ? "text" : "password"; };
+$("pin").addEventListener("input", () => { $("pin").value = $("pin").value.replace(/\D/g, ""); });
+
+$("form").onsubmit = async (e) => {
+  e.preventDefault();
+  const name = $("name").value.trim(), pin = $("pin").value.trim();
+  if (name.length < 2) return showError("bad_name");
+  if (!/^\d{4,6}$/.test(pin)) return showError(mode === "signup" ? "bad_pin" : "bad_login");
+  const body = mode === "signup" ? { name, pin, zone: $("zone").value, lang: $("lang").value } : { name, pin };
+  $("submit").disabled = true; $("submit").textContent = UI[lang].wait;
+  try {
+    const res = await fetch(mode === "signup" ? "/api/signup" : "/api/login", {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
+    });
+    const data = await res.json();
+    if (data.retry_after) retryMinutes = Math.ceil(data.retry_after / 60);
+    if (!res.ok) throw new Error(data.error || "network");
+    store.set("seasense-lang", data.lang);
+    store.set("seasense-zone", data.zone);
+    location.href = "/";
+  } catch (err) {
+    showError(err.message in UI[lang].errors ? err.message : "network");
+    $("submit").disabled = false; apply();
+  }
+};
+
+fetch("/api/zones").then((r) => r.json()).then((d) => { zones = d.zones; apply(); }).catch(() => apply());
+apply();
+</script>
+</body>
+</html>

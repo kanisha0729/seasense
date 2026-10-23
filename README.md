@@ -1,20 +1,51 @@
 # SeaSense
 
-**Spoken sea-safety briefings for coastal fishermen, as an MCP server for Alexa+.**
+**Spoken sea-safety briefings for coastal fishermen, in English, Tamil and Hindi.**
 
-Fishermen on the Tamil Nadu coast often leave harbour before dawn, and sea conditions can change within hours. SeaSense turns free wave and weather forecasts into short briefings meant to be read aloud, plus a plain go / no-go answer for the next 12 hours.
+SeaSense tells a fisherman the waves, wind and rain for his usual fishing zone over the next 12 hours, and says plainly whether it's **Safe**, **Caution** or **Don't go**. It uses the live forecast, remembers each user's zone and language, and speaks the answer aloud.
 
-> ⚠️ **Not official guidance.** The risk levels use starter thresholds we chose for this hackathon demo. They are not IMD or INCOIS guidance and must not be used as the only basis for a decision to go to sea.
+Built for the Build, Ship, Shape: Amazon Developer Hackathon (Alexa+ track).
 
-## Tools
+## How it works
+
+```
+ Alexa+ / any MCP client ──► server.py (MCP server, 7 tools) ─┐
+                                                              ├──► seasense_core.py ──► Open-Meteo Marine + Forecast APIs (live)
+ Web browser ─────────────► web.py (web app + JSON API) ──────┘        │
+                                                                       ├── risk.py   Safe / Caution / Don't go rules
+                                                                       ├── i18n.py   English, Tamil, Hindi text
+                                                                       └── zones.py  5 Tamil Nadu fishing zones
+```
+
+- **Backend:** `seasense_core.py` fetches the live forecast for the next 12 hours, works out the trip risk and writes the spoken text. Both front ends use it, so they always agree.
+- **Voice front end:** `server.py` is an MCP server. Alexa+ (or Claude Desktop, or MCP Inspector) calls its tools.
+- **Visual front end:** `web.py` serves a web app with a risk card, live metrics, 12-hour charts and a **Listen** button that reads the briefing aloud in the chosen language.
+- **One account, two front ends:** users sign in with their name and a 4 to 6 digit PIN (stored as a salted PBKDF2 hash). Their zone and language are one profile: set it on the web, and Alexa+ uses it when the same person asks by name, and the reverse.
+
+## What makes SeaSense different
+
+| Feature | What it does | Where |
+| --- | --- | --- |
+| **Best time to go** | Searches the next 24 hours for the earliest window of at least 3 safe hours: "Don't go now, but 4:30 to 9:30 AM tomorrow should be safe." If there's no safe window, it names the calmest Caution stretch or says to stay ashore. | Voice + dashboard (24-hour colour strip) |
+| **Trip check-in for family** | "I'm going to Rameswaram, back by 2 PM." Family can ask Alexa "Is Murugan back?" or open a private link. Once the trip is overdue, they're told to call first, then the **Coast Guard on 1554** (toll-free search and rescue). | Voice + dashboard + family page `/trip/<link>` |
+| **Worse-weather warning** | Records the sea at departure. If waves rise 0.5 m or more, gusts rise 10 km/h or more, or the risk level goes up, every later check warns: "Conditions have worsened since you left." | Voice + dashboard + family page |
+| **Harbour board** | Every zone on one TV screen with verdict, waves, gusts and best time. Rotates English, Tamil and Hindi every 20 s and refreshes every 10 min. Built for a harbour office or fishing co-op TV, in any TV or desktop browser, with no remote needed. | `/board` (`/board?lang=ta` pins one language) |
+
+## MCP tools
 
 | Tool | What it does |
 | --- | --- |
-| `get_sea_briefing(zone, user)` | Waves now and the max over the next 12 hours, wind, peak gust and when it hits, rain chance, and a trip-risk verdict. |
-| `check_trip_risk(zone, user)` | Quick verdict for the next 12 hours: **Safe**, **Caution** or **Don't go**, with the reason that decided it. |
-| `save_my_zone(user, zone)` | Remembers a user's usual zone, so later they can just ask for "my briefing". |
+| `get_sea_briefing(zone, user, language)` | Full spoken briefing: waves, wind, gusts, rain, and the trip-risk verdict |
+| `check_trip_risk(zone, user, language)` | Quick go / no-go with the one reason that decided it |
+| `find_best_time(zone, user, language)` | The safest time to set out in the next 24 hours |
+| `save_my_zone(user, zone, language)` | Remembers a user's usual zone and language |
+| `start_trip(user, back_by, zone, language)` | Logs a trip ("2 PM", "14:00", "8 hours") and records the sea at departure |
+| `end_trip(user, language)` | "I'm back" |
+| `check_on_trip(user, language)` | For family: at sea / overdue (with Coast Guard 1554) / back, plus a worse-weather warning |
 
-For the first two tools, pass either a `zone` or a `user` whose zone was saved. Read-only tools are marked `read_only_hint` so a client can call them without asking for confirmation.
+`language` accepts `en`, `ta` (Tamil) or `hi` (Hindi). Zone names work in any of the three languages, for example `Rameswaram`, `ராமேஸ்வரம்` or `रामेश्वरम`.
+
+Read-only tools (`get_sea_briefing`, `check_trip_risk`, `find_best_time`, `check_on_trip`) carry `read_only_hint`, so a client like Alexa+ can call them without asking for confirmation. The tools that save something are marked as writes.
 
 Example output:
 
@@ -25,33 +56,15 @@ Trip risk: Safe, because of waves under 1.5 metres and gusts under 30 km/h.
 ```
 *(Illustrative format. Live numbers come from the current forecast.)*
 
-## Zones
-
-Chennai coast, Nagapattinam, Rameswaram, Thoothukudi, Kanyakumari.
-
-Each zone is a fixed point a little offshore, because the marine API returns no wave data for points on land. Partial names work too (`rames` matches Rameswaram).
-
-## Risk rules
-
-The verdict uses the **worst** wave height and gust in the next 12 hours:
-
-| Level | Rule |
-| --- | --- |
-| Safe | waves under 1.5 m **and** gusts under 30 km/h |
-| Caution | waves 1.5–2.5 m **or** gusts 30–45 km/h |
-| Don't go | waves over 2.5 m **or** gusts over 45 km/h |
-
-The thresholds live in `risk.py` so they're easy to replace with validated values.
-
 ## Setup
 
-Requires Python 3.10+.
+Requires Python 3.10+ (and Node.js only if you want MCP Inspector). No API keys are needed.
 
 **Windows (PowerShell)**
 ```powershell
 python -m venv .venv
 Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass   # only if activation is blocked
-.venv\Scripts\activate
+.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
 ```
 
@@ -62,24 +75,22 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-No API keys are needed.
-
 ## Run
 
-**Streamable HTTP** (the transport Alexa+ uses):
+**MCP server over Streamable HTTP** (MCP spec 2025-11-25, the transport the Alexa+ track requires):
 ```bash
 python server.py --http                 # serves http://127.0.0.1:8000/mcp
 python server.py --http --port 9000     # pick another port
 ```
+To test it, run `npx @modelcontextprotocol/inspector` in a second terminal, choose **Streamable HTTP**, enter `http://127.0.0.1:8000/mcp` and click **Connect**.
 
-**stdio, with MCP Inspector** (how we tested):
+**MCP server over stdio** (MCP Inspector's stdio mode, Claude Desktop):
 ```bash
 npx @modelcontextprotocol/inspector .venv/Scripts/python.exe server.py   # Windows
 npx @modelcontextprotocol/inspector .venv/bin/python server.py           # macOS / Linux
 ```
-Or point the Inspector at the HTTP URL above using its "Streamable HTTP" option.
 
-**Claude Desktop** — add this to `claude_desktop_config.json` (use your own absolute paths):
+**Claude Desktop:** add this to `claude_desktop_config.json` (use your own absolute paths):
 ```json
 {
   "mcpServers": {
@@ -91,36 +102,78 @@ Or point the Inspector at the HTTP URL above using its "Streamable HTTP" option.
 }
 ```
 
+**Web app:**
+```bash
+python web.py
+```
+Then open http://127.0.0.1:8080, create an account, and you're on the dashboard. For Tamil and Hindi voices, use Microsoft Edge, which includes natural Indian-language voices. The harbour board is at http://127.0.0.1:8080/board.
+
+Run `web.py` and `server.py --http` at the same time: they share the same accounts, saved zones and trips, stored in `data/` (git-ignored).
+
 ## Tests
 
 ```bash
-pip install pytest
-python -m pytest tests
+python -m unittest discover tests -v     # or: pip install pytest && python -m pytest tests
 ```
-The tests cover the risk rules (including the exact boundaries) and zone matching. They don't need the network.
 
-## How it works
+33 automated tests, no internet needed (the forecast is replaced with fixed sample data). They cover the risk rules and their exact boundaries, zone matching in all 3 languages, reports in all 3 languages, voice tools sharing the web profile, sign-up validation, the full account flow, best-time windows, trip check-in and overdue alerts, the worse-weather warning, family links, the harbour board, PIN brute-force lockout, change PIN, delete account, damaged-file recovery, forecast failure, security headers and cookies, and 404s.
 
-```
-Alexa+ / MCP client ──► server.py (MCP, 3 tools)
-                           ├─ zones.py   zone name → offshore lat/lon
-                           ├─ Open-Meteo Marine API     wave height
-                           ├─ Open-Meteo Forecast API   wind, gusts, rain chance
-                           └─ risk.py    worst 12 h → Safe / Caution / Don't go
-```
-The two API calls run in parallel with `httpx`. If either fails, the tool returns a short spoken apology instead of an error, and the failure is logged to stderr. Saved zones are kept in `data/users.json` (local to the machine, not committed).
+## Security
+
+- PINs are stored only as salted PBKDF2-SHA256 hashes (200,000 rounds), never as plain text.
+- 5 wrong PINs within 10 minutes lock that name for 10 minutes (HTTP 429).
+- Session cookie is `HttpOnly` and `SameSite=Lax`. Set `SEASENSE_HTTPS=1` when serving over HTTPS to make it `Secure`.
+- Requests that change data must be JSON, which blocks cross-site form attacks.
+- Headers: Content-Security-Policy, `X-Frame-Options: DENY`, `nosniff`, Referrer-Policy, Permissions-Policy.
+- Account files are written atomically. A damaged file is set aside and never silently overwritten.
+
+**Known limits:** lockout is per name, so someone could deliberately lock out another user for 10 minutes. Accounts live in JSON files, which suits a demo but not thousands of users (move to SQLite or Postgres). There's no PIN reset, because there's no email or SMS channel yet. Run behind HTTPS before putting it on the internet.
+
+## Configuration
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `SEASENSE_HOST` | `127.0.0.1` | Address to listen on |
+| `SEASENSE_PORT` | `8080` | Port |
+| `SEASENSE_HTTPS` | unset | Set to `1` behind HTTPS so the session cookie is `Secure` |
+
+No API keys or secrets are needed, because Open-Meteo is free and keyless.
+
+## Risk rules
+
+| Level | Waves (next 12 h) | Wind gusts (next 12 h) |
+| --- | --- | --- |
+| Safe | under 1.5 m | and under 30 km/h |
+| Caution | 1.5 to 2.5 m | or 30 to 45 km/h |
+| Don't go | over 2.5 m | or over 45 km/h |
+
+> These are starter thresholds for a hackathon demo, **not official IMD guidance**. Always follow IMD and INCOIS warnings before going to sea.
+
+The verdict uses the **worst** wave height and gust in the window. Thresholds live in `risk.py`, so they're easy to replace with validated values.
+
+## Zones
+
+Chennai coast, Nagapattinam, Rameswaram, Thoothukudi, Kanyakumari: points a little offshore, because the marine model has no wave data on land. Partial names work too (`rames` matches Rameswaram; at least 3 letters are needed).
+
+## Data
+
+Live hourly forecast from [Open-Meteo](https://open-meteo.com/) (Marine API for wave height, Forecast API for wind, gusts and rain chance). It's free and needs no API key. The two API calls run in parallel with `httpx`, and each forecast is cached for 10 minutes. If a call fails, users hear a short apology and the error is logged to stderr.
 
 ## Why we demo outside Alexa+
 
-Alexa+ isn't available to us in India, so we tested with MCP Inspector and Claude Desktop. The server speaks standard MCP over Streamable HTTP, the protocol Alexa+ integrations use.
+We couldn't test on an Alexa+ device ourselves, so we tested with MCP Inspector and Claude Desktop. The server speaks standard MCP (spec 2025-11-25) over Streamable HTTP, the transport the Alexa+ track requires.
 
 ## What's next
 
-- Tamil-language briefings
-- SMS alerts for fishermen without smart speakers
-- More zones along the Tamil Nadu and Kerala coasts
-- Replace the starter thresholds with values checked against IMD / INCOIS ocean-state warnings and feedback from fishermen
+- Alexa+ skill listing, so fishermen can just ask out loud
+- SMS alerts before dawn for phones without data
+- Malayalam and Telugu, and more zones along the whole Indian coast
+- Official IMD and INCOIS warnings layered on top of the forecast
 
-## Data and license
+## Team
 
-Weather and marine data from [Open-Meteo](https://open-meteo.com/) (free, no key; see their terms for attribution). Code under the MIT License, see `LICENSE`.
+Kanisha and Deva (B.R Devamayookha).
+
+## License
+
+Code under the MIT License, see `LICENSE`. Weather and marine data from [Open-Meteo](https://open-meteo.com/); see their terms for attribution.

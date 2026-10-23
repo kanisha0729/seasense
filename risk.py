@@ -9,14 +9,19 @@ GUST_CAUTION_KMH = 30
 GUST_DANGER_KMH = 45
 
 
-def assess(max_wave_m: float, max_gust_kmh: float) -> tuple[str, str]:
-    """Return (level, reason) for the worst conditions in the trip window."""
+def assess(max_wave_m: float, max_gust_kmh: float) -> tuple[str, str, float]:
+    """Return (level, cause, value) for the worst conditions in the trip window.
+
+    level: "safe" | "caution" | "danger"
+    cause: "wave" | "gust" | "calm"
+    value: the number that decided it (metres or km/h)
+    """
     if max_wave_m > WAVE_DANGER_M:
-        return "Don't go", f"waves up to {max_wave_m:.1f} metres"
+        return "danger", "wave", max_wave_m
     if max_gust_kmh > GUST_DANGER_KMH:
-        return "Don't go", f"wind gusts up to {max_gust_kmh:.0f} km/h"
+        return "danger", "gust", max_gust_kmh
     if max_wave_m >= WAVE_CAUTION_M:
-        return "Caution", f"waves up to {max_wave_m:.1f} metres"
+        return "caution", "wave", max_wave_m
     if max_gust_kmh >= GUST_CAUTION_KMH:
-        return "Caution", f"wind gusts up to {max_gust_kmh:.0f} km/h"
-    return "Safe", f"waves under {WAVE_CAUTION_M} metres and gusts under {GUST_CAUTION_KMH} km/h"
+        return "caution", "gust", max_gust_kmh
+    return "safe", "calm", 0.0

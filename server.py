@@ -1,186 +1,180 @@
-"""SeaSense: spoken sea-safety briefings for coastal fishermen.
+"""SeaSense MCP server: what Alexa+ (or any MCP client) talks to.
 
-An MCP server with three tools:
+Tools:
   get_sea_briefing  - waves, wind and rain for a zone, as a short spoken briefing
   check_trip_risk   - Safe / Caution / Don't go for the next 12 hours
-  save_my_zone      - remembers a user's usual zone
+  find_best_time    - the safest time to set out in the next 24 hours
+  save_my_zone      - remembers a user's usual zone and language
+  start_trip        - "I'm going to sea, back by 2 PM" (records conditions at departure)
+  end_trip          - "I'm back"
+  check_on_trip     - for family: at sea / overdue (+ Coast Guard 1554) / back,
+                      and a warning if the sea has got worse since departure
 
-Data: Open-Meteo Marine and Forecast APIs (free, no API key).
+Languages: English (en), Tamil (ta), Hindi (hi).
+Live data: Open-Meteo Marine + Forecast APIs. Logic lives in seasense_core.py.
 """
 
 import argparse
-import asyncio
-import json
 import logging
-from datetime import datetime, timedelta, timezone
-from pathlib import Path
 
-import httpx
 from mcp.server.mcpserver import MCPServer
 from mcp.types import ToolAnnotations
 
-from risk import assess
-from zones import find_zone, zone_names
-
-MARINE_URL = "https://marine-api.open-meteo.com/v1/marine"
-FORECAST_URL = "https://api.open-meteo.com/v1/forecast"
-TRIP_HOURS = 12  # how far ahead a fishing trip looks
-IST = timezone(timedelta(hours=5, minutes=30))
-USERS_FILE = Path(__file__).parent / "data" / "users.json"
+import seasense_core as core
+from i18n import TEXT, normalize_lang, t
+from zones import find_zone_key, zone_list, zone_name
 
 logging.getLogger("httpx").setLevel(logging.WARNING)  # hide per-request log lines
 log = logging.getLogger("seasense")  # logs go to stderr, never into the MCP stdio stream
 
+# Hints for the client (Alexa+): read-only tools can run without asking the user to confirm.
+READ = ToolAnnotations(read_only_hint=True, open_world_hint=True)
+WRITE = ToolAnnotations(read_only_hint=False, idempotent_hint=True)
+WRITE_NEW = ToolAnnotations(read_only_hint=False, idempotent_hint=False, open_world_hint=True)
+
 server = MCPServer(
     "SeaSense",
     instructions=(
-        "Sea-safety briefings for coastal fishermen in Tamil Nadu. "
-        "Read the tool output aloud as it is; it is written to be spoken."
+        "Sea-safety briefings for coastal fishermen in Tamil Nadu, in English, Tamil or Hindi. "
+        "Pass language='ta' for Tamil or 'hi' for Hindi when the user speaks that language. "
+        "When someone says they are going fishing, call start_trip; when they are back, end_trip. "
+        "When a family member asks whether someone is back, call check_on_trip. "
+        "Read the tool output aloud exactly as it is; it is written to be spoken."
     ),
 )
 
 
-# ---------- saved zones ----------
-
-def load_users() -> dict:
-    if USERS_FILE.exists():
-        return json.loads(USERS_FILE.read_text(encoding="utf-8"))
-    return {}
-
-
-def save_users(users: dict) -> None:
-    USERS_FILE.parent.mkdir(parents=True, exist_ok=True)
-    USERS_FILE.write_text(json.dumps(users, indent=2), encoding="utf-8")
-
-
-def resolve_zone(zone: str, user: str) -> dict | None:
-    """Use the zone the user named, or fall back to their saved zone."""
+def _resolve(zone: str, user: str, language: str) -> tuple[str | None, str, str | None]:
+    """Work out (zone_key, lang, error_message) from what the user gave."""
+    saved = core.get_user(user) if user else None
+    lang = normalize_lang(language) if language else (saved or {}).get("lang", "en")
     if zone:
-        return find_zone(zone)
+        key = find_zone_key(zone)
+        if not key:
+            return None, lang, t(lang, "unknown_zone", zone=zone, zones=zone_list(lang))
+        return key, lang, None
+    if saved:
+        return saved["zone"], lang, None
     if user:
-        saved = load_users().get(user.strip().lower())
-        if saved:
-            return find_zone(saved)
-    return None
+        return None, lang, t(lang, "no_saved_zone", user=user, zones=zone_list(lang))
+    return None, lang, t(lang, "unknown_zone", zone="", zones=zone_list(lang))
 
 
-def unknown_zone_message(zone: str, user: str) -> str:
-    if not zone and user:
-        return (f"I don't have a saved zone for {user} yet. "
-                f"Tell me your usual zone first. I know: {zone_names()}.")
-    return f"I don't know the zone '{zone}'. I know: {zone_names()}."
-
-
-# ---------- weather data ----------
-
-async def fetch_conditions(zone: dict) -> dict:
-    """Get the next TRIP_HOURS of waves, wind and rain for a zone."""
-    common = {"latitude": zone["lat"], "longitude": zone["lon"],
-              "timezone": "GMT", "forecast_days": 2}
-    async with httpx.AsyncClient(timeout=15) as client:
-        marine, weather = await asyncio.gather(
-            client.get(MARINE_URL, params={**common, "hourly": "wave_height,wave_period"}),
-            client.get(FORECAST_URL, params={
-                **common,
-                "hourly": "wind_speed_10m,wind_gusts_10m,precipitation_probability",
-            }),
-        )
-    marine.raise_for_status()
-    weather.raise_for_status()
-    m, w = marine.json()["hourly"], weather.json()["hourly"]
-
-    # keep only the hours from now until the end of the trip window
-    now = datetime.now(timezone.utc).replace(minute=0, second=0, microsecond=0)
-    end = now + timedelta(hours=TRIP_HOURS)
-
-    def window(times, values):
-        out = []
-        for t, v in zip(times, values):
-            ts = datetime.fromisoformat(t).replace(tzinfo=timezone.utc)
-            if now <= ts < end and v is not None:
-                out.append((ts, v))
-        return out
-
-    waves = window(m["time"], m["wave_height"])
-    winds = window(w["time"], w["wind_speed_10m"])
-    gusts = window(w["time"], w["wind_gusts_10m"])
-    rain = window(w["time"], w["precipitation_probability"])
-    if not waves or not gusts:
-        raise ValueError("no forecast data for this zone right now")
-
-    peak_gust_time, peak_gust = max(gusts, key=lambda p: p[1])
-    return {
-        "wave_now": waves[0][1],
-        "wave_max": max(v for _, v in waves),
-        "wind_now": winds[0][1] if winds else 0,
-        "gust_max": peak_gust,
-        "gust_peak_at": peak_gust_time.astimezone(IST).strftime("%I %p").lstrip("0"),
-        "rain_max": max((v for _, v in rain), default=0),
-    }
-
-
-# ---------- tools ----------
-
-@server.tool(annotations=ToolAnnotations(read_only_hint=True, open_world_hint=True))
-async def get_sea_briefing(zone: str = "", user: str = "") -> str:
+@server.tool(annotations=READ)
+async def get_sea_briefing(zone: str = "", user: str = "", language: str = "") -> str:
     """Spoken sea-safety briefing for a fishing zone: waves, wind, rain and a
-    trip-risk verdict for the next 12 hours. Give a zone name, or a user name
-    whose zone was saved with save_my_zone."""
-    z = resolve_zone(zone, user)
-    if not z:
-        return unknown_zone_message(zone, user)
+    trip-risk verdict for the next 12 hours, from the live forecast.
+    zone: Chennai, Nagapattinam, Rameswaram, Thoothukudi or Kanyakumari (any language).
+    user: a name saved with save_my_zone, used when no zone is given.
+    language: 'en', 'ta' (Tamil) or 'hi' (Hindi); defaults to the user's saved language."""
+    key, lang, error = _resolve(zone, user, language)
+    if error:
+        return error
     try:
-        c = await fetch_conditions(z)
-    except Exception:
-        log.exception("forecast fetch failed for %s", z["name"])
-        return f"Sorry, I couldn't get the sea forecast for {z['name']} right now. Please try again in a minute."
-
-    level, reason = assess(c["wave_max"], c["gust_max"])
-    rain = (f"Rain chance up to {c['rain_max']:.0f} percent."
-            if c["rain_max"] >= 30 else "Little chance of rain.")
-    return (
-        f"Sea briefing for {z['name']}. "
-        f"Waves are {c['wave_now']:.1f} metres now, up to {c['wave_max']:.1f} metres in the next {TRIP_HOURS} hours. "
-        f"Wind is {c['wind_now']:.0f} km/h, with gusts up to {c['gust_max']:.0f} km/h around {c['gust_peak_at']}. "
-        f"{rain} "
-        f"Trip risk: {level}, because of {reason}."
-    )
+        return await _with_trip_warning(user, lang, (await core.get_report(key, lang))["briefing"])
+    except core.ForecastError:
+        log.exception("forecast fetch failed for %s", key)
+        return t(lang, "fetch_failed", zone=zone_name(key, lang))
 
 
-@server.tool(annotations=ToolAnnotations(read_only_hint=True, open_world_hint=True))
-async def check_trip_risk(zone: str = "", user: str = "") -> str:
-    """Quick go / no-go check for a fishing trip in the next 12 hours.
-    Returns Safe, Caution or Don't go, with the one reason that decided it."""
-    z = resolve_zone(zone, user)
-    if not z:
-        return unknown_zone_message(zone, user)
+async def _with_trip_warning(user: str, lang: str, text: str) -> str:
+    """If this user is at sea and the sea got worse since they left, say that first."""
+    trip = core.get_trip(user) if user else None
+    if trip and trip["status"] == "at_sea":
+        status = await core.trip_status(trip, lang)
+        if status["worsened"]:
+            return f"{status['warning']} {text}"
+    return text
+
+
+@server.tool(annotations=READ)
+async def check_trip_risk(zone: str = "", user: str = "", language: str = "") -> str:
+    """Quick go / no-go check for a fishing trip in the next 12 hours, from the
+    live forecast. Returns Safe, Caution or Don't go with the reason.
+    Same arguments as get_sea_briefing."""
+    key, lang, error = _resolve(zone, user, language)
+    if error:
+        return error
     try:
-        c = await fetch_conditions(z)
-    except Exception:
-        log.exception("forecast fetch failed for %s", z["name"])
-        return f"Sorry, I couldn't check conditions for {z['name']} right now. Please try again in a minute."
-
-    level, reason = assess(c["wave_max"], c["gust_max"])
-    advice = {
-        "Safe": "Conditions look fine for a trip.",
-        "Caution": "Go only if you must, stay close to shore, and keep checking.",
-        "Don't go": "Please stay ashore today.",
-    }[level]
-    return f"{level} for {z['name']}: {reason} expected in the next {TRIP_HOURS} hours. {advice}"
+        return await _with_trip_warning(user, lang, (await core.get_report(key, lang))["risk"])
+    except core.ForecastError:
+        log.exception("forecast fetch failed for %s", key)
+        return t(lang, "fetch_failed", zone=zone_name(key, lang))
 
 
-@server.tool(annotations=ToolAnnotations(read_only_hint=False, idempotent_hint=True))
-async def save_my_zone(user: str, zone: str) -> str:
-    """Remember a user's usual fishing zone, so later briefings need no zone."""
+@server.tool(annotations=READ)
+async def find_best_time(zone: str = "", user: str = "", language: str = "") -> str:
+    """The safest time to set out in the next 24 hours, e.g. 'Don't go now, but
+    4 AM to 9 AM tomorrow should be safe'. Same arguments as get_sea_briefing."""
+    key, lang, error = _resolve(zone, user, language)
+    if error:
+        return error
+    try:
+        return (await core.best_window(key, lang))["text"]
+    except core.ForecastError:
+        log.exception("forecast fetch failed for %s", key)
+        return t(lang, "fetch_failed", zone=zone_name(key, lang))
+
+
+@server.tool(annotations=WRITE_NEW)
+async def start_trip(user: str, back_by: str, zone: str = "", language: str = "") -> str:
+    """Log that a fisherman is going to sea, so family can check on them.
+    back_by: when they expect to return, e.g. '2 PM', '14:00' or '8 hours'.
+    zone: defaults to the user's saved zone."""
     if not user.strip():
-        return "Please tell me your name so I can remember your zone."
-    z = find_zone(zone)
-    if not z:
-        return f"I don't know the zone '{zone}'. I know: {zone_names()}."
-    users = load_users()
-    users[user.strip().lower()] = z["name"]
-    save_users(users)
-    return f"Got it, {user}. Your usual zone is {z['name']}. Ask me for your sea briefing any time."
+        return t(normalize_lang(language), "need_name")
+    key, lang, error = _resolve(zone, user, language)
+    if error:
+        return error
+    when = core.parse_back_by(back_by)
+    if not when:
+        return t(lang, "bad_back_by")
+    try:
+        trip = await core.start_trip(user, key, when)
+    except core.ForecastError:
+        log.exception("forecast fetch failed for %s", key)
+        return t(lang, "fetch_failed", zone=zone_name(key, lang))
+    return t(lang, "trip_started", user=trip["name"], zone=zone_name(key, lang),
+             back=core._when(trip["back_by"], lang), level=TEXT[lang]["level"][trip["at_start"]["level"]])
+
+
+@server.tool(annotations=WRITE)
+async def end_trip(user: str, language: str = "") -> str:
+    """Mark that a fisherman is safely back on shore."""
+    if not user.strip():
+        return t(normalize_lang(language), "need_name")
+    lang = normalize_lang(language) if language else (core.get_user(user) or {}).get("lang", "en")
+    trip = core.end_trip(user)
+    return t(lang, "trip_ended", user=trip["name"]) if trip else t(lang, "no_trip", user=user)
+
+
+@server.tool(annotations=READ)
+async def check_on_trip(user: str, language: str = "") -> str:
+    """For family at home: is this fisherman back yet? Says whether they are at sea,
+    overdue (with the Coast Guard number) or back, and warns if the sea has got
+    worse since they left."""
+    if not user.strip():
+        return t(normalize_lang(language), "need_name")
+    lang = normalize_lang(language) if language else (core.get_user(user) or {}).get("lang", "en")
+    trip = core.get_trip(user)
+    if not trip:
+        return t(lang, "no_trip", user=user)
+    status = await core.trip_status(trip, lang)
+    return f"{status['text']} {status['warning']}".strip()
+
+
+@server.tool(annotations=WRITE)
+async def save_my_zone(user: str, zone: str, language: str = "en") -> str:
+    """Remember a user's usual fishing zone and language, so later briefings
+    need only their name."""
+    lang = normalize_lang(language)
+    if not user.strip():
+        return t(lang, "need_name")
+    key = find_zone_key(zone)
+    if not key:
+        return t(lang, "unknown_zone", zone=zone, zones=zone_list(lang))
+    core.save_user(user, key, lang)
+    return t(lang, "saved", user=user, zone=zone_name(key, lang))
 
 
 if __name__ == "__main__":
@@ -191,7 +185,9 @@ if __name__ == "__main__":
     parser.add_argument("--port", type=int, default=8000)
     args = parser.parse_args()
     if args.http:
-        # Streamable HTTP endpoint: http://<host>:<port>/mcp
+        # Streamable HTTP endpoint (MCP spec 2025-11-25): http://<host>:<port>/mcp
+        logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
+        print(f"SeaSense MCP server (Streamable HTTP) at http://{args.host}:{args.port}/mcp  (Ctrl+C to stop)")
         server.run("streamable-http", host=args.host, port=args.port)
     else:
         server.run()  # stdio, for MCP Inspector and Claude Desktop
